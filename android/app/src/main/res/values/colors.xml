@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 跟网页里的 --bg 保持一致，启动时不闪白 -->
+    <color name="app_bg">#090A0C</color>
+    <color name="ic_launcher_background">#0F1115</color>
+</resources>
