@@ -30,16 +30,33 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: 准备 Android SDK（自动接受许可协议）
-        uses: android-actions/setup-android@v3
+      # 不用 android-actions/setup-android：它内部会跑 `sdkmanager tools`，而 tools 包在
+      # 新版 cmdline-tools 里已废弃，会直接 exit 1 把整个构建掐死（实测踩过）。
+      # ubuntu runner 自带 /usr/local/lib/android/sdk，许可也已接受，够用了。
+      - name: 检查自带 Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "--- platforms ---";   ls "$ANDROID_HOME/platforms"  || true
+          echo "--- build-tools ---"; ls "$ANDROID_HOME/build-tools" || true
+          echo "--- java ---";        java -version
+
+      - name: 补齐缺失的 SDK 组件（自带就不装）
+        run: |
+          miss=""
+          [ -d "$ANDROID_HOME/platforms/android-34" ]   || miss="$miss platforms;android-34"
+          [ -d "$ANDROID_HOME/build-tools/34.0.0" ]     || miss="$miss build-tools;34.0.0"
+          if [ -n "$miss" ]; then
+            echo "需要安装:$miss"
+            sdkmanager $miss
+          else
+            echo "android-34 与 build-tools;34.0.0 都是自带的，跳过安装"
+          fi
 
       - name: 准备 Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-
-      - name: 补齐 SDK 组件
-        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
 
       - name: 把网页放进 APK 的 assets
         run: |
