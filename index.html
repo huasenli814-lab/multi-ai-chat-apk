@@ -1,0 +1,2778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#0f1115">
+<meta name="format-detection" content="telephone=no">
+<title>多 AI 群聊</title>
+<style>
+:root {
+  color-scheme: dark;
+  --app-h: 100dvh;
+  --app-top: 0px;
+  --bg: #090a0c;
+  --panel: rgba(25, 26, 30, .94);
+  --panel-2: #1c1d22;
+  --line: rgba(255, 255, 255, .095);
+  --fg: #f5f5f7;
+  --fg-dim: #9899a1;
+  --accent: #0a84ff;
+  --accent-fg: #ffffff;
+  --danger: #ff6961;
+
+  --green: #30d158;
+  --radius-sm: 12px;
+  --radius-md: 17px;
+  --radius-lg: 22px;
+  --shadow-soft: 0 10px 32px rgba(0, 0, 0, .22);
+  --shadow-sheet: 0 -18px 55px rgba(0, 0, 0, .38);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+body {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+button, input, textarea, select {
+  color: inherit;
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+button, [role="button"], input, textarea, select {
+  outline-color: var(--accent);
+}
+
+button:focus-visible, input:focus-visible, textarea:focus-visible,
+select:focus-visible, [role="button"]:focus-visible {
+  outline: 2px solid rgba(10, 132, 255, .85);
+  outline-offset: 2px;
+}
+
+#app {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--app-top);
+  height: var(--app-h);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% -20%, rgba(70, 78, 96, .16), transparent 55%),
+    var(--bg);
+  isolation: isolate;
+}
+
+#topbar {
+  position: relative;
+  z-index: 3;
+  flex: 0 0 auto;
+  min-height: calc(54px + var(--safe-top));
+  padding: calc(7px + var(--safe-top)) 13px 7px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+  background: rgba(18, 19, 23, .88);
+  border-bottom: 1px solid var(--line);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+}
+
+#title {
+  min-width: 0;
+  margin: 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -.025em;
+  line-height: 1.3;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.icon-btn {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: transparent;
+  color: #d4d5da;
+  font-size: 20px;
+  cursor: pointer;
+  transition: background .18s ease, transform .18s ease, color .18s ease;
+}
+.icon-btn:active {
+  transform: scale(.94);
+  background: rgba(255, 255, 255, .09);
+}
+#btnHistory, #btnSettings {
+  min-width: 42px;
+  min-height: 42px;
+}
+
+#list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 14px 22px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.16) transparent;
+  scroll-behavior: smooth;
+}
+#list::-webkit-scrollbar { width: 4px; }
+#list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.15);
+  border-radius: 8px;
+}
+
+.empty {
+  margin: auto 12px;
+  padding: 28px 18px;
+  text-align: center;
+  color: var(--fg-dim);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.empty::first-line {
+  color: #d9d9de;
+}
+
+.msg {
+  position: relative;
+  flex: 0 0 auto;
+  height: auto;
+  min-width: 0;
+  max-width: min(94%, 760px);
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel-2);
+  color: var(--fg);
+  box-shadow: 0 3px 12px rgba(0,0,0,.08);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.72;
+  animation: msg-in .22s ease-out both;
+}
+.msg.user {
+  align-self: flex-end;
+  max-width: 88%;
+  padding: 11px 15px;
+  color: var(--accent-fg);
+  background: linear-gradient(145deg, #1687ff, #0066d6);
+  border-color: rgba(125, 190, 255, .28);
+  border-radius: 19px 19px 6px 19px;
+  box-shadow: 0 5px 16px rgba(0, 102, 214, .19);
+}
+.msg.ai {
+  align-self: flex-start;
+  padding-left: 16px;
+  border-radius: 6px 18px 18px 18px;
+}
+.msg.ai::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: var(--model-color, #8e8e93);
+}
+.msg .who {
+  margin: 0 0 6px;
+  color: var(--model-color, #b6b8c0);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .025em;
+  line-height: 1.35;
+}
+.msg .body {
+  min-width: 0;
+  color: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.72;
+  font-size: 14px;
+}
+.msg .body > :first-child { margin-top: 0; }
+.msg .body > :last-child { margin-bottom: 0; }
+.msg .body p { margin: .45em 0; }
+.msg .body ul, .msg .body ol {
+  padding-left: 1.4em;
+  margin: .45em 0;
+}
+.msg .body li { margin: .18em 0; }
+.msg .body strong { color: #fff; font-weight: 700; }
+.msg .body a {
+  color: #64b5ff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.msg .body code {
+  padding: 2px 5px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 5px;
+  background: rgba(0,0,0,.24);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: .9em;
+}
+.msg .body pre {
+  max-width: 100%;
+  padding: 12px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(0,0,0,.25);
+  white-space: pre;
+}
+.msg .body pre code {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.msg .body blockquote {
+  margin: .6em 0;
+  padding: 2px 0 2px 11px;
+  border-left: 2px solid rgba(255,255,255,.23);
+  color: #c2c4cb;
+}
+.msg .body hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: .9em 0;
+}
+.msg .think {
+  margin: 0 0 9px;
+  padding: 7px 10px;
+  border-left: 2px solid #626875;
+  border-radius: 0 8px 8px 0;
+  background: rgba(255,255,255,.035);
+  color: #9297a2;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.msg .think.clamped {
+  max-height: 6.4em;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 65%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 65%, transparent 100%);
+}
+.msg.streaming { min-height: 24px; }
+.msg.streaming .body::after {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  margin-left: 3px;
+  vertical-align: -2px;
+  border-radius: 2px;
+  background: var(--model-color, #d1d1d6);
+  animation: cursor-blink 1s steps(2, start) infinite;
+}
+.msg.error {
+  color: #ffb4b0;
+  background: rgba(255, 69, 58, .105);
+  border-color: rgba(255, 105, 97, .32);
+}
+.msg.error::before { background: var(--danger); }
+.msg.error .who { color: #ff827a; }
+.msg.summary {
+  align-self: stretch;
+  max-width: 100%;
+  border: 1px solid rgba(232, 190, 104, .45);
+  background: linear-gradient(145deg, rgba(104, 79, 32, .18), rgba(37, 32, 24, .68));
+  box-shadow: 0 5px 18px rgba(0,0,0,.12), inset 0 1px rgba(255,255,255,.025);
+}
+.msg.summary::before { background: #e8be68; }
+.msg.summary .who { color: #e8be68; }
+
+.msg[data-p="qwen"] { --model-color: #4da3ff; }
+.msg[data-p="deepseek"] { --model-color: #8a9cff; }
+.msg[data-p="mimo"] { --model-color: #d18bff; }
+.msg[data-p="kimi"] { --model-color: #5bd6c5; }
+.msg[data-p="zhipu53"] { --model-color: #42d392; }
+.msg[data-p="zhipu53x"] { --model-color: #2dbb7f; }
+.msg[data-p="zhipu47"] { --model-color: #66c98f; }
+.msg[data-p="zhipu45"] { --model-color: #81d7a1; }
+.msg[data-p="zhipu42504"] { --model-color: #24a96d; }
+.msg[data-p="zhipu4"] { --model-color: #a0dfb5; }
+.msg[data-p^="zhipu"] { --model-color: #42c987; }
+
+.sum-btn {
+  align-self: center;
+  flex: 0 0 auto;
+  min-height: 32px;
+  margin: 0 0 4px;
+  padding: 5px 15px;
+  border: 1px dashed rgba(232, 190, 104, .42);
+  border-radius: 999px;
+  background: rgba(232, 190, 104, .055);
+  color: #d9b86f;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease, transform .18s ease;
+}
+.sum-btn:active {
+  transform: scale(.97);
+  background: rgba(232, 190, 104, .13);
+}
+
+#toBottom {
+  position: absolute;
+  z-index: 4;
+  right: 16px;
+  bottom: calc(var(--fab-bottom, 104px) + 8px);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 50%;
+  background: rgba(42, 43, 49, .94);
+  color: #f5f5f7;
+  box-shadow: 0 5px 18px rgba(0,0,0,.28);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  cursor: pointer;
+  transition: transform .18s ease, opacity .18s ease;
+}
+#toBottom:active { transform: scale(.92); }
+
+#chips {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 53px;
+  padding: 8px 12px 9px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  background: rgba(19, 20, 24, .96);
+  border-top: 1px solid rgba(255,255,255,.035);
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 94%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 0%, #000 94%, transparent 100%);
+}
+#chips::-webkit-scrollbar { display: none; }
+
+.chip {
+  flex: 0 0 auto;
+  position: relative;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border: 1px solid rgba(255,255,255,.105);
+  border-radius: 999px;
+  background: rgba(255,255,255,.045);
+  color: #b6b7bf;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease, color .18s ease, opacity .18s ease;
+}
+.chip .cd {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #686a73;
+}
+.chip.on {
+  border-color: color-mix(in srgb, var(--chip-color, #0a84ff) 55%, transparent);
+  background: color-mix(in srgb, var(--chip-color, #0a84ff) 13%, transparent);
+  color: #f5f5f7;
+}
+.chip.on .cd {
+  background: var(--chip-color, #0a84ff);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--chip-color, #0a84ff) 45%, transparent);
+}
+.chip.na {
+  opacity: .38;
+  filter: saturate(.3);
+}
+.chip.mention {
+  border-style: dashed;
+  border-color: var(--chip-color, #0a84ff);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--chip-color, #0a84ff) 18%, transparent);
+}
+.chip[data-id="qwen"] { --chip-color: #4da3ff; }
+.chip[data-id="deepseek"] { --chip-color: #8a9cff; }
+.chip[data-id="mimo"] { --chip-color: #d18bff; }
+.chip[data-id="kimi"] { --chip-color: #5bd6c5; }
+.chip[data-id="zhipu53"] { --chip-color: #42d392; }
+.chip[data-id="zhipu53x"] { --chip-color: #2dbb7f; }
+.chip[data-id="zhipu47"] { --chip-color: #66c98f; }
+.chip[data-id="zhipu45"] { --chip-color: #81d7a1; }
+.chip[data-id="zhipu42504"] { --chip-color: #24a96d; }
+.chip[data-id="zhipu4"] { --chip-color: #a0dfb5; }
+
+#relay {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 0 12px;
+  background: rgba(19, 20, 24, .96);
+  color: var(--fg-dim);
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.45;
+}
+#relay:empty { display: none; }
+#relayStatus {
+  display: block;
+  padding: 2px 0 7px;
+  color: #8e9099;
+}
+#relayStatus.busy, #relay.busy #relayStatus {
+  color: #72d99a;
+}
+
+#composer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 9px 12px calc(9px + var(--safe-bottom));
+  background: rgba(19, 20, 24, .97);
+  border-top: 1px solid rgba(255,255,255,.07);
+  -webkit-backdrop-filter: saturate(160%) blur(22px);
+  backdrop-filter: saturate(160%) blur(22px);
+}
+#input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: 132px;
+  min-height: 44px;
+  overflow-y: auto;
+  resize: none;
+  padding: 11px 14px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 19px;
+  background: #24252b;
+  color: var(--fg);
+  font-size: 15px;
+  line-height: 1.45;
+  box-shadow: inset 0 1px 1px rgba(0,0,0,.12);
+  scrollbar-width: thin;
+}
+#input::placeholder { color: #777982; }
+#input:focus {
+  border-color: rgba(10,132,255,.65);
+  box-shadow: 0 0 0 3px rgba(10,132,255,.11);
+  outline: none;
+}
+#input::-webkit-scrollbar { width: 3px; }
+#input::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 5px; }
+
+#relayGo {
+  flex: 0 0 auto;
+  min-width: 58px;
+  height: 42px;
+  padding: 0 12px;
+  align-self: flex-end;
+  border: 1px solid rgba(48,209,88,.24);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #32d45e, #20a94a);
+  color: #071a0c;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgba(48,209,88,.12);
+  cursor: pointer;
+  transition: filter .15s ease, transform .15s ease;
+}
+#relayGo:active { transform: scale(.95); filter: brightness(.92); }
+
+#send, #stop {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1;
+  box-shadow: 0 4px 12px rgba(10,132,255,.25);
+  cursor: pointer;
+  transition: transform .15s ease, filter .15s ease, background .15s ease;
+}
+#send:active, #stop:active { transform: scale(.92); }
+#stop {
+  background: #3a3b42;
+  color: #ff817a;
+  box-shadow: none;
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+#backdrop, .backdrop {
+  position: fixed;
+  z-index: 19;
+  inset: 0;
+  background: rgba(0,0,0,.58);
+  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: blur(5px);
+  opacity: 1;
+  transition: opacity .22s ease;
+}
+#backdrop[hidden], .backdrop[hidden] { display: none; }
+
+.sheet {
+  position: fixed;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  bottom: var(--kb, 0px);
+  max-height: 82%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.11);
+  border-bottom: 0;
+  border-radius: 25px 25px 0 0;
+  background: rgba(27,28,33,.985);
+  box-shadow: var(--shadow-sheet);
+  padding-bottom: var(--safe-bottom);
+  animation: sheet-in .26s cubic-bezier(.2,.8,.2,1) both;
+}
+.sheet[hidden] { display: none; }
+.sheet::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  border-radius: 99px;
+  background: #55565d;
+  transform: translateX(-50%);
+}
+.sheet-hd {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 58px;
+  padding: 17px 18px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.sheet-hd h2, .sheet-hd h3, .sheet-hd .title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -.025em;
+}
+.sheet-bd {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 14px 14px 18px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.16) transparent;
+}
+.sheet-ft {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 9px;
+  padding: 12px 14px calc(12px + var(--safe-bottom));
+  border-top: 1px solid var(--line);
+  background: rgba(27,28,33,.98);
+}
+.spacer { flex: 1 1 auto; }
+
+.pcard {
+  margin: 0 0 12px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,.075);
+  border-radius: 17px;
+  background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.018));
+  box-shadow: 0 3px 10px rgba(0,0,0,.06);
+  transition: opacity .18s ease, border-color .18s ease;
+}
+.pcard.off { opacity: .56; }
+.pcard.has-key { border-color: rgba(48,209,88,.2); }
+.pcard-hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  margin-bottom: 10px;
+}
+.pdot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  border-radius: 50%;
+  background: #777982;
+  box-shadow: 0 0 0 4px rgba(255,255,255,.035);
+}
+.pname {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+.switch {
+  position: relative;
+  width: 46px;
+  height: 28px;
+  flex: 0 0 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 99px;
+  background: #484950;
+  cursor: pointer;
+  transition: background .2s ease;
+}
+.switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.switch .sl {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #f7f7f8;
+  box-shadow: 0 1px 4px rgba(0,0,0,.28);
+  pointer-events: none;
+  transition: transform .2s cubic-bezier(.2,.8,.2,1);
+}
+.switch:has(input:checked) { background: #30d158; }
+.switch:has(input:checked) .sl { transform: translateX(18px); }
+.switch:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 10px 0;
+  color: #d8d9de;
+  font-size: 12px;
+}
+.field .hint {
+  color: var(--fg-dim);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.field input, .field textarea, .field select,
+.key-row input, .row input, .row select {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 11px;
+  background: #15161a;
+  color: var(--fg);
+  font-size: 13px;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.12);
+}
+.field input::placeholder, .key-row input::placeholder { color: #6f717a; }
+.field input:focus, .field textarea:focus, .field select:focus,
+.key-row input:focus, .row input:focus, .row select:focus {
+  border-color: rgba(10,132,255,.72);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(10,132,255,.11);
+}
+.field select, .row select {
+  appearance: none;
+  padding-right: 32px;
+  background-image: linear-gradient(45deg, transparent 50%, #9b9da6 50%),
+    linear-gradient(135deg, #9b9da6 50%, transparent 50%);
+  background-position: calc(100% - 15px) 18px, calc(100% - 10px) 18px;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.key-row, .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.key-row input { flex: 1 1 auto; }
+.key-row button, .row button {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 11px;
+  background: rgba(255,255,255,.06);
+  color: #e5e5e9;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.row button.primary, button.primary {
+  border-color: rgba(10,132,255,.3);
+  background: linear-gradient(180deg, #168cff, #0672e5);
+  color: white;
+  font-weight: 650;
+  box-shadow: 0 4px 12px rgba(10,132,255,.16);
+}
+.row button:active, .key-row button:active, button.primary:active {
+  transform: scale(.98);
+  filter: brightness(.93);
+}
+#displayCard {
+  margin-bottom: 14px;
+}
+#showThink {
+  accent-color: var(--accent);
+}
+.pmember {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 49px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255,255,255,.055);
+}
+.pmember.off { opacity: .48; }
+.pmname {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: #e6e6eb;
+  font-size: 13px;
+  font-weight: 600;
+}
+.pmmodel {
+  max-width: 42%;
+  color: var(--fg-dim);
+  font-size: 11px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.pmember input[type="checkbox"], #showThink {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  accent-color: var(--green);
+}
+
+#sheet-history .sheet-bd, #sheet-summary .sheet-bd { padding-top: 8px; }
+.hrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 68px;
+  padding: 10px 4px 10px 10px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.hmain {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.htitle {
+  overflow: hidden;
+  color: #f0f0f4;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hmeta {
+  margin-top: 4px;
+  color: var(--fg-dim);
+  font-size: 11px;
+}
+.hdel {
+  flex: 0 0 auto;
+  min-width: 54px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255,69,58,.1);
+  color: #ff827a;
+  font-size: 12px;
+  cursor: pointer;
+}
+#summaryList .row, #summaryList button, #historyList button {
+  cursor: pointer;
+}
+#summaryList > *, #providerList > * { max-width: 100%; }
+
+#btnSaveSettings, #btnCloseSettings, #btnNew,
+#btnCopyDebug, #btnClearDebug, #btnCloseDebug {
+  min-height: 42px;
+  padding: 0 15px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.075);
+  color: #f0f0f4;
+  font-weight: 600;
+  cursor: pointer;
+}
+#btnSaveSettings, #btnNew { background: var(--accent); color: #fff; }
+
+#toast {
+  position: fixed;
+  z-index: 50;
+  left: 50%;
+  bottom: calc(var(--fab-bottom, 104px) - 8px + var(--kb, 0px));
+  max-width: calc(100% - 36px);
+  padding: 10px 15px;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 999px;
+  background: rgba(48,49,55,.96);
+  color: #f5f5f7;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,.3);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  transform: translateX(-50%);
+  animation: toast-in .2s ease-out both;
+}
+
+#debug {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: calc(14px + var(--safe-top)) 12px calc(12px + var(--safe-bottom));
+  background: #030405;
+  color: #d0f5d8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+#debug[hidden] { display: none; }
+#debugLog {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid #1e3a2a;
+  border-radius: 10px;
+  background: #080d0a;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+#debug button {
+  margin-top: 8px;
+  min-height: 40px;
+  border: 1px solid #294b35;
+  border-radius: 9px;
+  background: #101a13;
+  color: #c5f4d0;
+}
+
+@keyframes cursor-blink {
+  to { visibility: hidden; }
+}
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes sheet-in {
+  from { opacity: .65; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, 5px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (max-width: 390px) {
+  #list { padding: 14px 10px 18px; gap: 9px; }
+  .msg { max-width: 97%; padding: 11px 12px; }
+  .msg.user { max-width: 91%; }
+  #chips { gap: 6px; padding-left: 9px; padding-right: 9px; }
+  .chip { padding: 6px 9px; font-size: 11px; }
+  #composer { gap: 6px; padding-left: 8px; padding-right: 8px; }
+  #relayGo { min-width: 54px; padding: 0 9px; }
+  #input { padding-left: 12px; padding-right: 12px; }
+  .sheet-bd { padding-left: 11px; padding-right: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  /* 默认仍为深色；如想跟随系统浅色，可保留本段。 */
+  :root {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: rgba(250,250,252,.94);
+    --panel-2: #ffffff;
+    --line: rgba(0,0,0,.09);
+    --fg: #1d1d1f;
+    --fg-dim: #777780;
+    --accent: #007aff;
+    --accent-fg: #ffffff;
+    --danger: #d92d35;
+  }
+  #app {
+    background: radial-gradient(ellipse at 50% -20%, rgba(180,190,210,.2), transparent 55%), var(--bg);
+  }
+  #topbar, #chips, #relay, #composer {
+    background: rgba(250,250,252,.92);
+    border-color: rgba(0,0,0,.07);
+  }
+  .icon-btn { color: #4b4b50; }
+  .msg { box-shadow: 0 3px 12px rgba(0,0,0,.045); }
+  .msg.ai { background: #fff; }
+  .msg .body strong { color: #1d1d1f; }
+  .msg .body code, .msg .body pre { background: #f2f2f5; border-color: rgba(0,0,0,.08); }
+  .msg .body blockquote { color: #64646b; border-left-color: rgba(0,0,0,.2); }
+  .msg .think { background: rgba(0,0,0,.035); color: #74747d; }
+  .chip { background: rgba(0,0,0,.035); color: #5b5b63; border-color: rgba(0,0,0,.1); }
+  .chip.on { color: #1d1d1f; }
+  #input { background: #e9e9ee; color: #1d1d1f; border-color: rgba(0,0,0,.06); }
+  #input::placeholder { color: #85858d; }
+  .sheet { background: rgba(250,250,252,.99); border-color: rgba(0,0,0,.1); }
+  .sheet-ft { background: rgba(250,250,252,.98); }
+  .pcard { background: linear-gradient(145deg, #fff, #f8f8fa); border-color: rgba(0,0,0,.07); }
+  .field { color: #4a4a50; }
+  .field input, .field textarea, .field select, .key-row input, .row input, .row select {
+    background: #f0f0f4; color: #1d1d1f; border-color: rgba(0,0,0,.1);
+  }
+  .pmname, .htitle { color: #242428; }
+  .pmmodel, .hmeta { color: #777780; }
+  .hrow, .pmember { border-color: rgba(0,0,0,.07); }
+  .msg.summary { background: linear-gradient(145deg, rgba(232,190,104,.13), rgba(255,255,255,.9)); }
+  #toBottom { background: rgba(255,255,255,.96); color: #1d1d1f; border-color: rgba(0,0,0,.1); }
+  #toast { background: rgba(40,40,45,.94); color: #fff; }
+}
+
+/* ==========================================================================
+   以下三处是**接入时补的必要修补**，不是美化。GPT 那版样式本身没问题，
+   这三条是因为它拿不到真实 HTML、只能照规格写，所以在细节上踩了坑。
+   ========================================================================== */
+
+/* 修补 1（必须）：浏览器默认的 [hidden]{display:none} 优先级极低，任何作者写的
+   display 都能盖过它。原样式用一条 !important 全局规则兜住，GPT 换成了三条不含
+   #stop 的具体规则 —— 结果「停止」键、「↓回到底部」、闲聊进度行的 hidden 全部失效、
+   一直显示（探针实测 #stop 是 display:flex，#toBottom 是 flex，#relayStatus 是 block）。
+   这里把全局强制隐藏加回来。 */
+[hidden]{ display: none !important; }
+
+/* 修补 2（必须）：#toBottom 被改成了 40x40 的圆形图标按钮，但它的文案是
+   「↓ 回到底部」四个字 —— 会竖排挤成一列并溢出圆圈。改成装得下文字的胶囊。 */
+#toBottom{
+  width: auto; min-width: 40px; height: 32px;
+  padding: 0 14px; border-radius: 999px; white-space: nowrap;
+}
+
+/* 修补 3（亮色主题）：GPT 的亮色块改了输入框，但漏了这些按钮，它们仍带着深色主题的
+   「半透明白底 + 浅灰字」，在浅色卡片上几乎看不见（设置面板里的「显示」）。
+   「关闭」必须单独列出来 —— 它靠 #btnCloseSettings 这个 **ID 选择器**上色，
+   优先级高于 .row button，只补类选择器修不到它。
+   注意：#btnSaveSettings / #btnNew 是蓝底白字的主按钮（由后面的 accent 规则给出），
+   故意不列进来，否则会被这条盖成灰色。
+   debug 面板的按钮另有 #debug button（ID+元素，优先级更高）兜着，列上也不影响。 */
+@media (prefers-color-scheme: light){
+  .key-row button, .row button,
+  #btnCloseSettings, #btnCloseDebug, #btnClearDebug, #btnCopyDebug{
+    background: #f0f0f4; color: #1d1d1f; border-color: rgba(0,0,0,.12);
+  }
+  .key-row button:active, .row button:active,
+  #btnCloseSettings:active, #btnCloseDebug:active, #btnClearDebug:active, #btnCopyDebug:active{
+    background: #e4e4ea;
+  }
+}
+
+/* 修补 4：输入框右侧那条竖线 = GPT 给 textarea 单独画的滚动条
+   （#input::-webkit-scrollbar{width:3px} + 半透明滑块），安卓上即使没溢出也会渲染成一条线。
+   输入框本来就会自动增高、能用手指滚，滚动条没必要存在，直接隐藏。 */
+#input{ scrollbar-width: none; }
+#input::-webkit-scrollbar{ display: none; }
+
+/* 修补 5：底部三个控件统一高度。
+   原来输入框 44px、绿色「闲聊」42px、蓝色发送/停止 38px —— 三个都不一样高，
+   看起来蓝色那颗"小了一圈"。统一到一个变量上，以后改一处就都跟着变。 */
+:root{ --ctl-h: 44px; }
+#input{ min-height: var(--ctl-h); }
+#relayGo{ height: var(--ctl-h); }
+#send, #stop{
+  width: var(--ctl-h); height: var(--ctl-h);
+  min-width: var(--ctl-h); min-height: var(--ctl-h);
+}
+
+/* 修补 6：历史会话行做成和设置面板一致的「一张卡一行」。
+   原来 .hmain 是个 <button>，GPT 没给它 text-align:left（按钮默认居中）、
+   也没清掉灰底，所以渲染成"一块居中的灰色横条"，和设置面板完全不像。 */
+.hrow{
+  gap: 8px;
+  min-height: 56px;
+  margin: 0 0 8px;
+  padding: 4px 8px 4px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.hrow:last-child{ margin-bottom: 0; }
+.hrow.active{ border-color: var(--accent); }
+.hmain{
+  flex: 1 1 auto; min-width: 0;
+  padding: 10px 0;
+  background: transparent; border: 0; border-radius: 0;
+  text-align: left;                 /* 必须显式写：<button> 默认 text-align:center */
+  color: inherit;
+}
+.htitle{ font-size: 15px; }
+.hmeta{ margin-top: 3px; font-size: 12px; }
+.hdel{
+  min-width: 0; min-height: 32px; padding: 6px 12px;
+  border-radius: 10px;
+  background: rgba(255,69,58,.12);
+  color: var(--danger);
+  font-size: 13px;
+}
+.hdel:active{ background: rgba(255,69,58,.22); }
+
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header id="topbar">
+    <button class="icon-btn" id="btnHistory" aria-label="历史会话">☰</button>
+    <div id="title">千问</div>
+    <button class="icon-btn" id="btnSettings" aria-label="设置">⚙</button>
+  </header>
+
+  <main id="list"></main>
+
+  <button id="toBottom" hidden>↓ 回到底部</button>
+
+  <div id="chips"></div>
+
+  <!-- 闲聊的进度行（入口是发送键旁边那颗绿色「闲聊」按钮，不在这里）。
+       刻意不放进 #chips —— renderChips() 是 innerHTML 全量重绘，放进去每次点 chip 都会被抹掉。 -->
+  <section id="relay">
+    <div id="relayStatus" hidden></div>
+  </section>
+
+  <footer id="composer">
+    <textarea id="input" rows="1" placeholder="发消息…" enterkeyhint="send"
+              autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+    <button id="relayGo" aria-label="闲聊">闲聊</button>
+    <button id="send" aria-label="发送">↑</button>
+    <button id="stop" aria-label="停止" hidden>■</button>
+  </footer>
+</div>
+
+<div id="backdrop" class="backdrop" hidden></div>
+
+<section id="sheet-settings" class="sheet" hidden>
+  <div class="sheet-hd">设置</div>
+  <!-- 全局显示选项固定在最上面。注意不能塞进 #providerList ——
+       renderProviders() 会 innerHTML 全量重写它，塞进去会被抹掉。 -->
+  <div class="sheet-bd">
+    <div class="pcard" id="displayCard">
+      <div class="pcard-hd">
+        <span class="pdot"></span>
+        <span class="pname">显示</span>
+        <span class="spacer"></span>
+        <label class="switch"><input type="checkbox" id="showThink"><span class="sl"></span></label>
+      </div>
+      <div class="field"><span>思考过程</span>
+        <div class="hint">Kimi 这类思考模型会先吐一大段 reasoning。默认关掉，气泡里只留正文；打开才显示灰色「思考过程」块。对全部平台（含闲聊）一起生效。</div>
+      </div>
+    </div>
+    <div id="providerList"></div>
+  </div>
+  <div class="sheet-ft">
+    <div class="row">
+      <button class="primary" id="btnSaveSettings">保存</button>
+      <button id="btnCloseSettings">关闭</button>
+    </div>
+  </div>
+</section>
+
+<section id="sheet-history" class="sheet" hidden>
+  <div class="sheet-hd">
+    <span>历史会话</span>
+    <span class="spacer"></span>
+    <button class="icon-btn" id="btnNew" aria-label="新建会话">＋</button>
+  </div>
+  <div class="sheet-bd" id="historyList"></div>
+</section>
+
+<section id="sheet-summary" class="sheet" hidden>
+  <div class="sheet-hd">选一个 AI 来总结</div>
+  <div class="sheet-bd" id="summaryList"></div>
+</section>
+
+<div id="debug" hidden>
+  <pre id="debugLog"></pre>
+  <div class="row">
+    <button id="btnCopyDebug">复制</button>
+    <button id="btnClearDebug">清空</button>
+    <button id="btnCloseDebug">关闭</button>
+  </div>
+</div>
+
+<div id="toast" hidden></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ==================== 常量 ==================== */
+var LS = {
+  sessions:'qwen.sessions', activeId:'qwen.activeId',
+  showThink:'display.showThink'                  // 「显示思考过程」开关，缺省视为关
+};
+
+/* 每个模型一套独立配置，id 同时是 localStorage 前缀（qwen.* / deepseek.*）。
+   沿用旧的 qwen.key / qwen.model / qwen.endpoint 键名，手机上已有的 Key 不用重填。 */
+var CUSTOM_MODEL = '__custom__';   // 模型下拉里「自定义…」那一项的值
+
+/* 同一 family 的成员（智谱那 6 个）在设置面板里合并成一张卡片 */
+var FAMILY_NAME = { zhipu:'智谱' };
+function familyMembers(fid){
+  return PROVIDERS.filter(function(p){ return p.family === fid; });
+}
+
+/* 改过接口地址的平台：这里列出"旧默认值"，init 读到存档等于旧值时自动换成新的 defEndpoint。
+   （用户手机上已经存过那个旧地址，不迁移的话改了代码也没用。） */
+var LEGACY_ENDPOINTS = {
+  mimo: ['https://api.xiaomimimo.com/v1/chat/completions']
+};
+
+/* ==================== 平台表 ====================
+   ⚠ 下面这张表必须是**纯字面量**：mobile/stream-parse.test.cjs 靠字符串定位把它单独
+   拎出来 new Function 求值（这样以后加平台，测试里的断言会自动跟上）。
+   所以里面**不能**写成 zhipuMember(...) 之类的函数调用，也不能引用外部常量，
+   否则那个测试会直接 ReferenceError 挂掉。 */
+var PROVIDERS = [
+  { id:'qwen', name:'千问',
+    defEndpoint:'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
+    defModel:'qwen-plus',
+    key:'', endpoint:'', model:'', enabled:true },
+  { id:'deepseek', name:'DeepSeek',
+    defEndpoint:'https://api.deepseek.com/chat/completions',
+    defModel:'deepseek-chat',
+    key:'', endpoint:'', model:'', enabled:true },
+  { id:'mimo', name:'MiMo',
+    defEndpoint:'https://token-plan-cn.xiaomimimo.com/v1/chat/completions',
+    defModel:'mimo-v2.6-flash',
+    lowerModel:true,   // MiMo 的模型名必须全小写，大写会 400 Unsupported model
+    modelHint:'必须全小写（mimo-v2.6-flash），写成大写会报 400 Unsupported model',
+    key:'', endpoint:'', model:'', enabled:true },
+  /* 智谱 6 个模型：各算一个独立成员（独立 chip / 独立 enabled / 独立 selected），
+     但共用同一个 endpoint 和同一份 Key（存 zhipu.key，只有一份）。
+     地址这里重复写 6 遍是故意的 —— 见上面那条「必须是纯字面量」的警告。 */
+  { id:'zhipu53', name:'智谱5.3', family:'zhipu',
+    defEndpoint:'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+    defModel:'glm-5.3-flash', key:'', endpoint:'', model:'glm-5.3-flash', enabled:true },
+  { id:'zhipu53x', name:'智谱5.3x', family:'zhipu',
+    defEndpoint:'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+    defModel:'glm-5.3-flashx', key:'', endpoint:'', model:'glm-5.3-flashx', enabled:true },
+  { id:'zhipu47', name:'智谱4.7', family:'zhipu',
+    defEndpoint:'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+    defModel:'glm-4.7-flash', key:'', endpoint:'', model:'glm-4.7-flash', enabled:true },
+  { id:'zhipu45', name:'智谱4.5', family:'zhipu',
+    defEndpoint:'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+    defModel:'glm-4.5-flash', key:'', endpoint:'', model:'glm-4.5-flash', enabled:true },
+  { id:'zhipu42504', name:'智谱4-2504', family:'zhipu',
+    defEndpoint:'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+    defModel:'glm-4-flash-250414', key:'', endpoint:'', model:'glm-4-flash-250414', enabled:true },
+  { id:'zhipu4', name:'智谱4', family:'zhipu',
+    defEndpoint:'https://open.bigmodel.cn/api/paas/v4/chat/completions',
+    defModel:'glm-4-flash', key:'', endpoint:'', model:'glm-4-flash', enabled:true },
+  { id:'kimi', name:'Kimi',
+    defEndpoint:'https://api.moonshot.cn/v1/chat/completions',
+    defModel:'kimi-k2.6',
+    lowerModel:true,   // Moonshot 的模型名都是小写
+    // 思考模型：先吐 reasoning_content 再吐 content，解析器已把两者分开
+    modelHint:'填 kimi-k2.6 —— kimi-k3 不在这张 15 元代金券的范围内',
+    key:'', endpoint:'', model:'', enabled:true }
+];
+function providerById(id){
+  for(var i = 0; i < PROVIDERS.length; i++) if(PROVIDERS[i].id === id) return PROVIDERS[i];
+  return null;
+}
+/* 旧历史里的 provider 标记 —— 这些 id 现在都不在 PROVIDERS 里了，靠这张表兜底显示，
+   否则老会话的气泡会变成 "AI"、看不出是谁答的（CSS 的 [data-p^="zhipu"] 仍会给它们上色）。
+   - zhipu     ：智谱只有一个平台的时候（拆成 6 个成员之前）
+   - zhipu53 … ：接力写死 5 个智谱模型的时候（后来改成 chip 驱动，但这些 id 留在了历史里） */
+var LEGACY_RELAY_LABEL = {
+  zhipu:'智谱',
+  zhipu53:'智谱5.3', zhipu53x:'智谱5.3x', zhipu47:'智谱4.7', zhipu45:'智谱4.5',
+  zhipu42504:'智谱4-2504', zhipu4:'智谱4'
+};
+
+function providerName(id){
+  var p = providerById(id);
+  if(p) return p.name;                                        // 现在 6 个智谱成员都在表里，直接命中
+  if(LEGACY_RELAY_LABEL[id]) return LEGACY_RELAY_LABEL[id];   // 兜底：万一某个旧 id 不在表里了
+  return 'AI';   // 更旧的会话消息没有 provider 字段
+}
+function hasAnyKey(){
+  for(var i = 0; i < PROVIDERS.length; i++) if(PROVIDERS[i].key) return true;
+  return false;
+}
+/* 可用的平台：设置里开着 + 填了 Key（和"本次选没选中"无关） */
+function usableProviders(){
+  return PROVIDERS.filter(function(p){ return p.enabled && p.key; });
+}
+/* 本次真正要发给谁：可用 + chip 选中 */
+function selectedProviders(){
+  return usableProviders().filter(function(p){ return p.selected; });
+}
+/* chip 点击：切换选中并落盘 */
+function toggleSelection(p){
+  p.selected = !p.selected;
+  persistProviders();
+  return p.selected;
+}
+/* 模型名收尾：空的回落默认值；标了 lowerModel 的一律转小写
+   （手机输入法很容易把首字母顶成大写，MiMo 大写会直接 400） */
+function normalizeModel(p, v){
+  v = String(v == null ? '' : v).trim();
+  if(!v) return p.defModel;
+  return p.lowerModel ? v.toLowerCase() : v;
+}
+
+/* 带 modelOptions 的平台，模型框是「下拉 + 选自定义时才出现的输入框」。
+   这里算出打开面板时该选哪一项：
+   - 当前值是某个预设 → 选中那一项，输入框藏起来
+   - 是别的（手输过的）→ 选中「自定义…」，并把当前值回填进输入框 */
+function modelPickerState(p){
+  var cur = p.model || p.defModel;
+  var isPreset = (p.modelOptions || []).indexOf(cur) !== -1;
+  return { value:cur, preset:isPreset ? cur : CUSTOM_MODEL, custom:!isPreset };
+}
+
+/* 只认「开头」的 @提及 —— 正文里的 @ 不参与路由，
+   这样"什么是 @media 查询"不会被误当成点名。
+   支持连写多个：@千问 @DeepSeek 对比一下
+   @ 后面紧跟平台名即可，后面有没有空格都认（@千问你好 也能路由）。 */
+function parseMentions(text){
+  var rest = String(text == null ? '' : text), ids = [], guard = 0;
+  while(guard++ < 8 && rest.charAt(0) === '@'){
+    var body = rest.slice(1), hit = null, hitLen = 0;
+    PROVIDERS.forEach(function(p){
+      [p.name, p.id].forEach(function(alias){
+        var n = alias.length;
+        if(n > hitLen && body.slice(0, n).toLowerCase() === alias.toLowerCase()){
+          hit = p; hitLen = n;
+        }
+      });
+    });
+    if(!hit) break;                                  // 不是已知平台名，当正文处理
+    if(ids.indexOf(hit.id) === -1) ids.push(hit.id);
+    rest = body.slice(hitLen).replace(/^[\s,，、]+/, '');
+  }
+  return ids.length ? { ids:ids, rest:rest } : null;
+}
+
+/* 这一次发给谁：文本里有开头的 @ 就以 @ 为准（chip 不参与），否则用 chip 勾选 */
+function resolveTargets(text){
+  var m = parseMentions(text);
+  if(!m) return { targets:selectedProviders(), text:text, via:'chip', missing:[] };
+  var byId = {}, missing = [];
+  PROVIDERS.forEach(function(p){ byId[p.id] = p; });
+  var targets = [];
+  m.ids.forEach(function(id){
+    var p = byId[id];
+    if(p && p.enabled && p.key) targets.push(p);
+    else missing.push(id);
+  });
+  // 全被 @ 吃光（只打了 @千问）时保留原文，别把消息变成空的
+  return { targets:targets, text:(m.rest.trim() || text), via:'mention', missing:missing };
+}
+
+var MAX_SESSIONS = 30;    // 最多保留会话数
+var MAX_MSGS     = 60;    // 每会话最多保留消息数
+var MAX_CHARS    = 8000;  // 单条正文最大字符数
+var CONTEXT_MSGS = 20;    // 每次请求携带的最近消息数
+
+/* ==================== 小工具 ==================== */
+function $(s, r){ return (r||document).querySelector(s); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function lsGet(k, def){
+  try{ var v = localStorage.getItem(k); return v === null ? def : v; }
+  catch(e){ return def; }
+}
+function lsSet(k, v){
+  try{ localStorage.setItem(k, v); return true; }
+  catch(e){ return false; }
+}
+function fmtTime(ts){
+  var d = new Date(ts || Date.now());
+  var now = new Date();
+  var p = function(n){ return n < 10 ? '0' + n : '' + n; };
+  if(d.toDateString() === now.toDateString()) return '今天 ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function copyText(t){
+  if(navigator.clipboard && window.isSecureContext){
+    return navigator.clipboard.writeText(t).then(function(){ return true; }, function(){ return legacyCopy(t); });
+  }
+  return Promise.resolve(legacyCopy(t));
+}
+function legacyCopy(t){
+  var ta = document.createElement('textarea');
+  ta.value = t;
+  ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  var ok = false;
+  try{ ok = document.execCommand('copy'); }catch(e){}
+  ta.remove();
+  return ok;
+}
+
+/* ==================== 调试面板 ==================== */
+var debugLines = [];
+function dlog(){
+  var parts = [];
+  for(var i = 0; i < arguments.length; i++){
+    var a = arguments[i];
+    parts.push(typeof a === 'string' ? a : (function(){ try{ return JSON.stringify(a); }catch(e){ return String(a); } })());
+  }
+  debugLines.push(new Date().toLocaleTimeString() + '  ' + parts.join(' '));
+  if(debugLines.length > 300) debugLines.shift();
+  if(!$('#debug').hidden) $('#debugLog').textContent = debugLines.join('\n');
+}
+window.addEventListener('error', function(e){
+  dlog('window.onerror:', (e && e.message) || 'unknown', (e && e.filename) || '', (e && e.lineno) || '');
+});
+window.addEventListener('unhandledrejection', function(e){
+  dlog('unhandledrejection:', (e && e.reason && (e.reason.message || e.reason.name)) || String(e && e.reason));
+});
+
+/* ==================== 状态 ==================== */
+var state = {
+  sessions:[], activeId:null,
+  streaming:false, abort:null
+};
+
+function makeSession(){
+  return { id:uid(), title:'新对话', createdAt:Date.now(), updatedAt:Date.now(), messages:[] };
+}
+function getActive(){
+  var s = null;
+  for(var i = 0; i < state.sessions.length; i++){
+    if(state.sessions[i].id === state.activeId){ s = state.sessions[i]; break; }
+  }
+  if(!s){
+    s = state.sessions[0] || makeSession();
+    if(!state.sessions.length) state.sessions.push(s);
+    state.activeId = s.id;
+  }
+  return s;
+}
+
+/* ==================== 持久化 ==================== */
+/* 每个模型的配置各存各的键：qwen.key / qwen.model / qwen.endpoint / qwen.enabled …
+   智谱那 6 个成员是例外：Key 共用一份（zhipu.key），endpoint / model 固定，
+   只把 enabled 和 selected 各自落盘（zhipu53.enabled / zhipu53.selected …）。 */
+function persistProviders(){
+  var sharedKeyDone = {};
+  PROVIDERS.forEach(function(p){
+    if(p.family){
+      lsSet(p.id + '.enabled',  p.enabled ? '1' : '0');
+      lsSet(p.id + '.selected', p.selected === false ? '0' : '1');
+      if(!sharedKeyDone[p.family]){        // 共用 Key 只写一次
+        sharedKeyDone[p.family] = true;
+        lsSet(p.family + '.key', p.key || '');
+      }
+      return;
+    }
+    lsSet(p.id + '.key',      p.key || '');
+    lsSet(p.id + '.model',    p.model || p.defModel);
+    lsSet(p.id + '.endpoint', p.endpoint || p.defEndpoint);
+    lsSet(p.id + '.enabled',  p.enabled ? '1' : '0');
+    lsSet(p.id + '.selected', p.selected === false ? '0' : '1');   // 缺省视为选中
+  });
+}
+
+var saveTimer = 0;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 300);
+}
+function saveNow(){
+  lsSet(LS.activeId, state.activeId);
+  persistProviders();
+
+  // 会话按最近更新倒序，超出上限丢最旧
+  state.sessions.sort(function(a, b){ return (b.updatedAt || 0) - (a.updatedAt || 0); });
+  if(state.sessions.length > MAX_SESSIONS) state.sessions.length = MAX_SESSIONS;
+
+  // 逐条裁剪（assistant 的 provider 标记必须留着，否则刷新后不知道是谁答的）
+  for(var i = 0; i < state.sessions.length; i++){
+    var s = state.sessions[i];
+    if(!Array.isArray(s.messages)) s.messages = [];
+    if(s.messages.length > MAX_MSGS) s.messages = s.messages.slice(-MAX_MSGS);
+    s.messages = s.messages.map(function(m){
+      var out = {
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: typeof m.content === 'string' ? m.content.slice(0, MAX_CHARS) : ''
+      };
+      if(out.role === 'assistant' && m.provider) out.provider = m.provider;
+      if(out.role === 'assistant' && m.summary) out.summary = true;   // 别把总结降级成普通回答
+      return out;
+    });
+  }
+
+  if(lsSet(LS.sessions, JSON.stringify(state.sessions))) return;
+
+  // 配额溢出：丢最旧的会话重试
+  while(state.sessions.length > 1){
+    state.sessions.pop();
+    if(lsSet(LS.sessions, JSON.stringify(state.sessions))){
+      toast('本地存储已满，已清理最旧的会话');
+      return;
+    }
+  }
+  toast('本地存储写入失败，历史可能不会被保存');
+}
+
+/* ==================== 视口 / 键盘 ==================== */
+/* 底部三块（chip 行 / 闲聊行 / 输入区）的实测总高度写进 --fab-bottom，
+   供 #toBottom、#toast 定位。闲聊状态行凭空多一行时也会跟着变，所以不能写死。 */
+var FAB_SELECTORS = ['#chips', '#relay', '#composer'];
+var lastFabH = -1;
+function syncFab(){
+  var h = 0;
+  for(var i = 0; i < FAB_SELECTORS.length; i++){
+    var el = $(FAB_SELECTORS[i]);
+    if(el) h += el.offsetHeight;
+  }
+  if(h === lastFabH) return;
+  lastFabH = h;
+  document.documentElement.style.setProperty('--fab-bottom', Math.round(h) + 'px');
+}
+function syncViewport(){
+  var vv = window.visualViewport;
+  var h  = vv ? vv.height    : window.innerHeight;
+  var t  = vv ? vv.offsetTop : 0;
+  var root = document.documentElement.style;
+  root.setProperty('--app-h', Math.round(h) + 'px');
+  root.setProperty('--app-top', Math.round(t) + 'px');
+  // 键盘遮挡的高度。安卓开了 interactive-widget=resizes-content 时 innerHeight
+  // 会跟着缩 → 算出来是 0；iOS 上 innerHeight 不变、visualViewport 变矮 → 得到
+  // 键盘高度。底部弹层用它抬起来，免得输入框/下拉被键盘压住。
+  var kb = Math.max(0, Math.round(window.innerHeight - (h + t)));
+  if(kb > 400) kb = 0;            // 明显是异常值（比如旋转屏瞬间）就别动，避免弹层乱跳
+  root.setProperty('--kb', kb + 'px');
+  syncFab();
+  if(pinned) scrollToBottom(true);
+}
+if(window.visualViewport){
+  window.visualViewport.addEventListener('resize', syncViewport);
+  window.visualViewport.addEventListener('scroll', syncViewport);
+}
+window.addEventListener('orientationchange', function(){ setTimeout(syncViewport, 300); });
+window.addEventListener('resize', syncViewport);
+window.addEventListener('pageshow', function(){ syncViewport(); });
+
+/* ==================== 滚动 ==================== */
+var pinned = true;   // 用户是否停在底部
+function atBottom(){
+  var l = $('#list');
+  return l.scrollHeight - l.scrollTop - l.clientHeight < 48;
+}
+function scrollToBottom(force){
+  var l = $('#list');
+  if(!force && !pinned) return;
+  l.scrollTop = l.scrollHeight;
+}
+$('#list').addEventListener('scroll', function(){
+  pinned = atBottom();
+  $('#toBottom').hidden = pinned;
+}, { passive:true });
+$('#toBottom').addEventListener('click', function(){
+  pinned = true; $('#toBottom').hidden = true; scrollToBottom(true);
+});
+
+/* ==================== 消息渲染 ==================== */
+/* 返回气泡外层；正文在 .body 里，流式时只改 .body，不会把模型名冲掉。
+   isSummary = 这是"总结"气泡，名字显示成"总结者：XXX"，样式也不同。 */
+function appendBubble(role, content, providerId, isSummary){
+  var list = $('#list');
+  var empty = $('#empty');
+  if(empty) empty.remove();
+  var el = document.createElement('div');
+  el.className = 'msg ' + (role === 'user' ? 'user' : 'ai');
+  if(role !== 'user'){
+    el.setAttribute('data-p', providerId || 'unknown');
+    if(isSummary) el.classList.add('summary');
+    var who = document.createElement('div');
+    who.className = 'who';
+    who.textContent = (isSummary ? '总结者：' : '') + providerName(providerId);
+    el.appendChild(who);
+    // 思考模型的思考过程：默认隐藏，收到 reasoning_content 才显示
+    var think = document.createElement('div');
+    think.className = 'think';
+    think.hidden = true;
+    el.appendChild(think);
+  }
+  var body = document.createElement('div');
+  body.className = 'body';
+  body.textContent = content || '';
+  el.appendChild(body);
+  list.appendChild(el);
+  return el;
+}
+function bubbleBody(el){ return el.querySelector('.body') || el; }
+function bubbleThink(el){ return el.querySelector('.think'); }
+
+/* ---------- 思考过程开关（全局，默认关） ---------- */
+/* reasoning_content 照旧一路累计（streamChat 里没动），只是开关关着时不上屏。
+   写 DOM 只留 paintThink 这一个口径，三处流式（普通发送 / 总结 / 闲聊）共用。 */
+function thinkOn(){
+  var cb = $('#showThink');
+  return !!(cb && cb.checked);
+}
+/* hasAnswer=true 表示正文已经开始 → 给思考过程加 clamped（收起 + 渐隐），保持原观感 */
+function paintThink(el, reason, hasAnswer){
+  if(!el || !reason || !thinkOn()) return;
+  el.hidden = false;
+  el.textContent = reason;
+  if(hasAnswer) el.classList.add('clamped');
+}
+/* 开关刚被关掉时，把屏幕上已经显示出来的灰块一并收走 */
+function hideAllThink(){
+  var els = document.querySelectorAll('.think');
+  for(var i = 0; i < els.length; i++) els[i].hidden = true;
+}
+
+function renderMessages(){
+  var list = $('#list');
+  list.innerHTML = '';
+  var s = getActive();
+  if(!s.messages.length){
+    var d = document.createElement('div');
+    d.id = 'empty'; d.className = 'empty';
+    var anyKey = hasAnyKey();
+    var l1 = document.createElement('div');
+    l1.innerHTML = anyKey ? '问点什么吧' : '<b>先填 API Key</b>';
+    d.appendChild(l1);
+    var l2 = document.createElement('div');
+    var on = selectedProviders();
+    l2.textContent = !anyKey
+      ? '右上角 ⚙ 打开设置'
+      : (on.length ? '本次发给：' + on.map(function(p){ return p.name; }).join(' + ')
+                   : '上方 chip 至少要点选一个 AI');
+    d.appendChild(l2);
+    if(anyKey){
+      var l3 = document.createElement('div');
+      l3.textContent = '点 chip 切换，或打 @ 点名（如 ' +
+        PROVIDERS.slice(0, 2).map(function(p){ return '@' + p.name; }).join(' ') + '）';
+      d.appendChild(l3);
+    }
+    list.appendChild(d);
+    return;
+  }
+  groupTurns(s.messages).forEach(function(t){
+    if(t.user) appendBubble('user', t.user.content);
+    t.replies.forEach(function(m){
+      appendBubble('assistant', m.content, m.provider, !!m.summary);
+    });
+    // 这一轮有人答成功、且还没总结过 → 给一个「总结」入口
+    if(turnNeedsSummaryButton(t)) appendSummaryButton(t);
+  });
+  pinned = true;
+  scrollToBottom(true);
+  updateSummaryButtons();
+}
+
+/* ---------- 总结 ---------- */
+function appendSummaryButton(turn){
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'sum-btn';
+  btn.textContent = '总结';
+  btn.addEventListener('click', function(){ openSummaryPicker(turn); });
+  $('#list').appendChild(btn);
+  return btn;
+}
+function updateSummaryButtons(){
+  var btns = document.querySelectorAll('.sum-btn');
+  for(var i = 0; i < btns.length; i++) btns[i].disabled = !!state.streaming;
+}
+function openSummaryPicker(turn){
+  if(state.streaming){ toast('等当前回答结束再总结'); return; }
+  if(!usableProviders().length){ openSettings(); toast('先配置至少一个平台的 Key'); return; }
+  var n = turn.replies.filter(function(m){ return !m.summary && m.content; }).length;
+  if(!n){ toast('这一轮没有可总结的回答'); return; }
+  renderSummaryPicker(turn, n);
+  openSheet('#sheet-summary');
+}
+function renderSummaryPicker(turn, n){
+  var box = $('#summaryList');
+  box.innerHTML = '';
+  var answered = {};
+  turn.replies.forEach(function(m){ if(!m.summary && m.content) answered[m.provider] = true; });
+
+  var head = document.createElement('div');
+  head.className = 'hmeta';
+  head.style.margin = '0 0 10px';
+  head.textContent = '本轮共 ' + n + ' 条回答将作为上下文，选一个 AI 来总结：';
+  box.appendChild(head);
+
+  usableProviders().forEach(function(p){
+    var row = document.createElement('div');
+    row.className = 'hrow';
+    var btn = document.createElement('button');
+    btn.className = 'hmain';
+    var ttl = document.createElement('div');
+    ttl.className = 'htitle';
+    ttl.textContent = p.name;
+    var meta = document.createElement('div');
+    meta.className = 'hmeta';
+    meta.textContent = p.model + (answered[p.id] ? ' · 本轮已回答' : '');
+    btn.appendChild(ttl);
+    btn.appendChild(meta);
+    btn.addEventListener('click', function(){ startSummary(turn, p); });
+    row.appendChild(btn);
+    box.appendChild(row);
+  });
+}
+/* 用一次普通调用做总结：上下文全在 prompt 里，不带会话历史 */
+function startSummary(turn, provider){
+  closeSheets();
+  if(state.streaming){ toast('等当前回答结束再总结'); return; }
+  if(!provider || !provider.enabled || !provider.key){ toast(providerName(provider && provider.id) + ' 不可用'); return; }
+  var ctx = turn.replies.filter(function(m){ return !m.summary && m.content; });
+  if(!ctx.length){ toast('这一轮没有可总结的回答'); return; }
+
+  var bubble = appendBubble('assistant', '', provider.id, true);
+  bubble.classList.add('streaming');
+  var body = bubbleBody(bubble), think = bubbleThink(bubble);
+  var j = { acc:'', reason:'', raf:0 };
+
+  var ctrl = new AbortController();
+  state.abort = ctrl;
+  setStreaming(true);
+  // 总结是用户主动点的，意图就是看它 —— 所以这条路径无条件贴底，
+  // 不走普通回答那条"用户上滑过就不拽回去"的规则。
+  pinned = true;
+  scrollToBottom(true);
+  dlog('SUMMARY by', provider.name, 'ctx=' + ctx.length);
+
+  var pushed = false;
+  streamChat(provider, [{ role:'user', content: buildSummaryPrompt(turn) }], {
+    signal: ctrl.signal,
+    onDelta: function(piece, full, reasoning){
+      j.acc = full;
+      if(reasoning) j.reason = reasoning;
+      if(!j.raf){
+        j.raf = requestAnimationFrame(function(){
+          j.raf = 0;
+          paintThink(think, j.reason, !!j.acc);
+          if(j.acc) body.textContent = j.acc;
+          scrollToBottom(true);      // 同上：总结路径每帧都跟着滚，不看 pinned
+        });
+      }
+    }
+  }).then(function(answer){
+    if(j.raf){ cancelAnimationFrame(j.raf); j.raf = 0; }
+    bubble.classList.remove('streaming');
+    paintThink(think, j.reason, true);
+    if(answer){
+      getActive().messages.push({ role:'assistant', content:answer, provider:provider.id, summary:true });
+      getActive().updatedAt = Date.now();
+      pushed = true;
+    }else{
+      body.textContent = '（总结为空）';
+    }
+  }, function(err){
+    if(j.raf){ cancelAnimationFrame(j.raf); j.raf = 0; }
+    bubble.classList.remove('streaming');
+    if(err && err.name === 'AbortError'){
+      dlog(provider.name, 'SUMMARY aborted at', j.acc.length, 'chars');
+      body.textContent = j.acc || '（已停止）';
+      if(j.acc){
+        getActive().messages.push({ role:'assistant', content:j.acc, provider:provider.id, summary:true });
+        pushed = true;
+      }
+    }else{
+      var msg = (err && err.message) || String(err);
+      dlog(provider.name, 'SUMMARY ERR', msg);
+      bubble.classList.add('error');
+      body.textContent = '总结失败：' + msg;
+    }
+  }).then(function(){
+    setStreaming(false);
+    state.abort = null;
+    save();
+    // 成功/中断才重建（让"总结者"标签生效、按钮消失）；失败就留着错误气泡别抹掉
+    if(pushed) renderMessages(); else updateSummaryButtons();
+    scrollToBottom(true);      // 收尾再贴一次底：错误文案可能刚把气泡撑高
+  });
+}
+function renderTopbar(){
+  $('#title').textContent = getActive().title || '千问';
+}
+function renderHistory(){
+  var box = $('#historyList');
+  box.innerHTML = '';
+  if(!state.sessions.length){
+    var p = document.createElement('div');
+    p.className = 'empty'; p.textContent = '还没有会话';
+    box.appendChild(p);
+    return;
+  }
+  state.sessions.forEach(function(s){
+    var row = document.createElement('div');
+    row.className = 'hrow' + (s.id === state.activeId ? ' active' : '');
+
+    var main = document.createElement('button');
+    main.className = 'hmain';
+    var t = document.createElement('div'); t.className = 'htitle'; t.textContent = s.title || '新对话';
+    var m = document.createElement('div'); m.className = 'hmeta';
+    m.textContent = fmtTime(s.updatedAt) + ' · ' + s.messages.length + ' 条';
+    main.appendChild(t); main.appendChild(m);
+    main.addEventListener('click', function(){ switchSession(s.id); closeSheets(); });
+
+    var del = document.createElement('button');
+    del.className = 'hdel'; del.textContent = '删除';
+    del.addEventListener('click', function(e){ e.stopPropagation(); removeSession(s.id); });
+
+    row.appendChild(main); row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+
+/* ==================== 会话操作 ==================== */
+function newSession(){
+  var s = makeSession();
+  state.sessions.unshift(s);
+  state.activeId = s.id;
+  pinned = true;
+  renderMessages(); renderTopbar(); renderHistory(); save();
+  return s;
+}
+function switchSession(id){
+  if(state.streaming) stopStream();
+  state.activeId = id;
+  pinned = true;
+  renderMessages(); renderTopbar(); renderHistory();
+  $('#toBottom').hidden = true;
+  save();
+}
+function removeSession(id){
+  var s = null;
+  for(var i = 0; i < state.sessions.length; i++) if(state.sessions[i].id === id) s = state.sessions[i];
+  if(!s) return;
+  if(s.messages.length && !confirm('删除会话「' + (s.title || '新对话') + '」？不可恢复。')) return;
+  state.sessions = state.sessions.filter(function(x){ return x.id !== id; });
+  if(!state.sessions.length) state.sessions.push(makeSession());
+  if(state.activeId === id) state.activeId = state.sessions[0].id;
+  renderMessages(); renderTopbar(); renderHistory(); saveNow();
+  toast('已删除');
+}
+
+/* ==================== 弹层 / toast ==================== */
+function openSheet(sel){
+  closeSheets();
+  $('#backdrop').hidden = false;
+  $(sel).hidden = false;
+}
+function closeSheets(){
+  $('#backdrop').hidden = true;
+  $('#sheet-settings').hidden = true;
+  $('#sheet-history').hidden = true;
+  $('#sheet-summary').hidden = true;
+  // 关面板时顺手收键盘：否则点完"保存"，键盘还杵在那儿挡住下面
+  var ae = document.activeElement;
+  if(ae && ae.blur) ae.blur();
+}
+$('#backdrop').addEventListener('click', closeSheets);
+
+var toastTimer = 0;
+function toast(msg){
+  var t = $('#toast');
+  t.textContent = msg;
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.hidden = true; }, 2200);
+}
+
+/* ==================== 设置 ==================== */
+function escAttr(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+/* 单个平台一张卡片（结构由固定常量拼出，只有 value 里可能含用户输入，所以走 escAttr） */
+function singleCardHtml(p){
+  // 声明了 modelOptions 的平台：模型框是「下拉 + 自定义输入」
+  var st = (p.modelOptions && p.modelOptions.length) ? modelPickerState(p) : null;
+  return '<div class="pcard' + (p.enabled ? '' : ' off') + (p.key ? ' has-key' : '') +
+           '" data-id="' + p.id + '">' +
+    '<div class="pcard-hd">' +
+      '<span class="pdot"></span>' +
+      '<span class="pname">' + p.name + '</span>' +
+      '<span class="spacer"></span>' +
+      '<label class="switch"><input type="checkbox" data-f="enabled"' +
+        (p.enabled ? ' checked' : '') + '><span class="sl"></span></label>' +
+    '</div>' +
+    '<label class="field"><span>API Key</span>' +
+      '<div class="key-row">' +
+        '<input type="password" data-f="key" placeholder="sk-..." value="' + escAttr(p.key) + '"' +
+          ' autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">' +
+        '<button type="button" data-f="showkey">显示</button>' +
+      '</div>' +
+    '</label>' +
+    (p.modelOptions && p.modelOptions.length
+      ? '<div class="field"><span>模型</span>' +
+          '<select data-f="preset">' +
+            p.modelOptions.map(function(m){
+              return '<option value="' + escAttr(m) + '"' +
+                (st.preset === m ? ' selected' : '') + '>' + escAttr(m) + '</option>';
+            }).join('') +
+            '<option value="' + CUSTOM_MODEL + '"' + (st.custom ? ' selected' : '') +
+              '>自定义…</option>' +
+          '</select>' +
+          '<input type="text" data-f="model"' + (st.custom ? '' : ' hidden') +
+            ' value="' + escAttr(p.model || p.defModel) + '"' +
+            ' placeholder="输入模型名，例如 glm-4.9" autocomplete="off"' +
+            ' autocapitalize="off" autocorrect="off" spellcheck="false">' +
+          (p.modelHint ? '<div class="hint">' + p.modelHint + '</div>' : '') +
+        '</div>'
+      : '<label class="field"><span>模型</span>' +
+          '<input type="text" data-f="model" value="' + escAttr(p.model || p.defModel) + '"' +
+            ' autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">' +
+          (p.modelHint ? '<div class="hint">' + p.modelHint + '</div>' : '') +
+        '</label>') +
+    '<label class="field"><span>接口地址</span>' +
+      '<input type="url" data-f="endpoint" value="' + escAttr(p.endpoint || p.defEndpoint) + '"' +
+        ' autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">' +
+    '</label>' +
+  '</div>';
+}
+
+/* 家族卡片（现在的智谱）：一份 Key + 每个成员一个开关。
+   endpoint 和模型名都是固定的，所以这里不画那两个输入框。 */
+function familyCardHtml(fid, members){
+  var key = members[0].key || '';
+  var anyOn = members.some(function(m){ return m.enabled; });
+  return '<div class="pcard' + (anyOn ? '' : ' off') + (key ? ' has-key' : '') +
+           '" data-family="' + fid + '">' +
+    '<div class="pcard-hd">' +
+      '<span class="pdot"></span>' +
+      '<span class="pname">' + (FAMILY_NAME[fid] || fid) + '</span>' +
+      '<span class="spacer"></span>' +
+      '<span class="hmeta">' + members.length + ' 个模型 · 共用一份 Key</span>' +
+    '</div>' +
+    '<label class="field"><span>API Key</span>' +
+      '<div class="key-row">' +
+        '<input type="password" data-f="key" placeholder="sk-..." value="' + escAttr(key) + '"' +
+          ' autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">' +
+        '<button type="button" data-f="showkey">显示</button>' +
+      '</div>' +
+    '</label>' +
+    '<div class="field"><span>启用哪些模型</span>' +
+      members.map(function(m){
+        return '<label class="pmember' + (m.enabled ? '' : ' off') + '">' +
+          '<span class="pmname">' + m.name + '</span>' +
+          '<span class="pmmodel">' + m.defModel + '</span>' +
+          '<span class="spacer"></span>' +
+          '<span class="switch"><input type="checkbox" data-f="enabled" data-pid="' + m.id + '"' +
+            (m.enabled ? ' checked' : '') + '><span class="sl"></span></span>' +
+        '</label>';
+      }).join('') +
+    '</div>' +
+  '</div>';
+}
+
+/* 按 PROVIDERS 顺序出卡片；family 相同的成员合并成一张（6 个智谱 → 1 张） */
+function renderProviders(){
+  var out = [], doneFamily = {};
+  PROVIDERS.forEach(function(p){
+    if(p.family){
+      if(doneFamily[p.family]) return;
+      doneFamily[p.family] = true;
+      out.push(familyCardHtml(p.family, familyMembers(p.family)));
+      return;
+    }
+    out.push(singleCardHtml(p));
+  });
+  $('#providerList').innerHTML = out.join('');
+}
+
+function openSettings(){
+  renderProviders();
+  openSheet('#sheet-settings');
+}
+$('#btnSettings').addEventListener('click', openSettings);
+$('#btnCloseSettings').addEventListener('click', closeSheets);
+
+/* 模型下拉切换：
+   - 选预设 → 把值写进输入框（保存逻辑照旧只读输入框），隐藏输入框
+   - 选「自定义…」→ 显示输入框并聚焦，让键盘直接起来 */
+$('#providerList').addEventListener('change', function(e){
+  var sel = e.target.closest ? e.target.closest('[data-f="preset"]') : null;
+  if(!sel) return;
+  var card = sel.closest('.pcard');
+  var inp = card && card.querySelector('[data-f="model"]');
+  if(!inp) return;
+  if(sel.value === CUSTOM_MODEL){
+    inp.hidden = false;
+    // 下一帧再聚焦：安卓上选择器刚关闭、焦点还没交还，立刻 focus 会失效
+    setTimeout(function(){ if(inp.focus) inp.focus(); }, 0);
+  }else{
+    inp.value = sel.value;
+    inp.hidden = true;
+  }
+});
+
+/* 开关即时生效，不必先点保存 —— 否则会出现"关了它却还在答"的困惑 */
+$('#providerList').addEventListener('change', function(e){
+  var cb = e.target.closest ? e.target.closest('[data-f="enabled"]') : null;
+  if(!cb) return;
+  var card = cb.closest('.pcard');
+  // 家族卡片里每个成员一行，各自带 data-pid；普通卡片还是靠整张卡的 data-id
+  var pid = cb.getAttribute('data-pid') || (card && card.getAttribute('data-id'));
+  var p = pid && providerById(pid);
+  if(!p) return;
+  p.enabled = cb.checked;
+  var row = cb.closest('.pmember');
+  if(row){
+    row.classList.toggle('off', !cb.checked);
+    // 家族卡片：6 个成员全关了才把整张卡置灰
+    if(card) card.classList.toggle('off', !familyMembers(p.family).some(function(m){ return m.enabled; }));
+  }else if(card){
+    card.classList.toggle('off', !cb.checked);
+  }
+  persistProviders();
+  renderChips();
+  renderMessages();
+});
+$('#providerList').addEventListener('click', function(e){
+  var btn = e.target.closest ? e.target.closest('[data-f="showkey"]') : null;
+  if(!btn) return;
+  var inp = btn.closest('.pcard').querySelector('[data-f="key"]');
+  var show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  btn.textContent = show ? '隐藏' : '显示';
+});
+
+$('#btnSaveSettings').addEventListener('click', function(){
+  var cards = $('#providerList').querySelectorAll('.pcard');
+  for(var i = 0; i < cards.length; i++){
+    var card = cards[i];
+    var fid = card.getAttribute('data-family');
+    if(fid){
+      // 家族卡片：一个 Key 喂给全部成员；每个成员一个开关（模型名/地址是固定的，不读）
+      var keyInp = card.querySelector('[data-f="key"]');
+      var kv = keyInp ? keyInp.value.trim() : '';
+      familyMembers(fid).forEach(function(m){ m.key = kv; });
+      var boxes = card.querySelectorAll('[data-f="enabled"][data-pid]');
+      for(var j = 0; j < boxes.length; j++){
+        var m = providerById(boxes[j].getAttribute('data-pid'));
+        if(m) m.enabled = boxes[j].checked;
+      }
+      continue;
+    }
+    var p = providerById(card.getAttribute('data-id'));
+    if(!p) continue;
+    p.key      = card.querySelector('[data-f="key"]').value.trim();
+    p.model    = normalizeModel(p, card.querySelector('[data-f="model"]').value);
+    p.endpoint = card.querySelector('[data-f="endpoint"]').value.trim() || p.defEndpoint;
+    p.enabled  = card.querySelector('[data-f="enabled"]').checked;
+  }
+  persistProviders();
+  closeSheets();
+  renderChips();
+  renderMessages();
+  // 「智谱」那一族算一个平台，别把 6 个模型名全塞进提示里
+  var toastNames = [], missing = [], seenFamily = {}, seenMissing = {};
+  PROVIDERS.forEach(function(p){
+    var label = p.family ? (FAMILY_NAME[p.family] || p.family) : p.name;
+    if(p.enabled && p.key){
+      if(seenFamily[label]) return;
+      seenFamily[label] = true;
+      toastNames.push(label);
+    }else if(p.enabled && !p.key){
+      if(seenMissing[label]) return;
+      seenMissing[label] = true;
+      missing.push(label);
+    }
+  });
+  if(!toastNames.length){
+    toast('已保存，但没有可用的模型（缺 Key 或全关了）');
+  }else{
+    toast('已保存 · ' + toastNames.join(' + ') +
+          (missing.length ? '（' + missing.join('、') + ' 缺 Key，跳过）' : ''));
+  }
+});
+
+/* ==================== 历史弹层 ==================== */
+$('#btnHistory').addEventListener('click', function(){
+  renderHistory();
+  openSheet('#sheet-history');
+});
+$('#btnNew').addEventListener('click', function(){
+  newSession();
+  closeSheets();
+  toast('已新建会话');
+});
+
+/* ==================== 调试面板开关：连点标题 5 次 ==================== */
+var tapCount = 0, tapTimer = 0;
+$('#title').addEventListener('click', function(){
+  tapCount++;
+  clearTimeout(tapTimer);
+  tapTimer = setTimeout(function(){ tapCount = 0; }, 1500);
+  if(tapCount >= 5){
+    tapCount = 0;
+    $('#debugLog').textContent = debugLines.join('\n') || '（暂无日志）';
+    $('#debug').hidden = false;
+  }
+});
+$('#btnCloseDebug').addEventListener('click', function(){ $('#debug').hidden = true; });
+$('#btnClearDebug').addEventListener('click', function(){
+  debugLines = []; $('#debugLog').textContent = '（暂无日志）';
+});
+$('#btnCopyDebug').addEventListener('click', function(){
+  copyText(debugLines.join('\n')).then(function(ok){ toast(ok ? '已复制' : '复制失败，请长按选择'); });
+});
+
+/* ==================== 输入区 ==================== */
+function autoGrow(){
+  var ta = $('#input');
+  ta.style.height = 'auto';
+  var lh = parseFloat(getComputedStyle(ta).lineHeight) || 24;
+  var max = lh * 5 + 20;
+  ta.style.height = Math.min(ta.scrollHeight, max) + 'px';
+}
+function setStreaming(on){
+  state.streaming = on;
+  $('#send').hidden = on;
+  $('#stop').hidden = !on;
+  // 忙的时候别让「闲聊」被重复点（它也走 state.streaming）
+  var rb = $('#relayGo');
+  if(rb) rb.disabled = on;
+  updateSummaryButtons();
+  autoGrow();
+}
+
+/* ---------- 参与者 chip ---------- */
+function renderChips(){
+  var box = $('#chips');
+  box.innerHTML = '';
+  PROVIDERS.forEach(function(p){
+    var usable = !!(p.enabled && p.key);
+    var el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'chip' + (p.selected ? ' on' : '') + (usable ? '' : ' na');
+    el.setAttribute('data-id', p.id);
+    var dot = document.createElement('span');
+    dot.className = 'cd';
+    var nm = document.createElement('span');
+    nm.textContent = p.name;
+    el.appendChild(dot);
+    el.appendChild(nm);
+    box.appendChild(el);
+  });
+  updateMentionHighlight();
+}
+/* 打了开头的 @ 时，用虚线框标出"这次实际发给谁"作反馈；
+   但不改动 chip 自身的选择（@ 只影响这一次） */
+function updateMentionHighlight(){
+  var m = parseMentions($('#input').value.trim());
+  var ids = m ? m.ids : [];
+  var chips = $('#chips').querySelectorAll('.chip');
+  for(var i = 0; i < chips.length; i++){
+    if(ids.indexOf(chips[i].getAttribute('data-id')) !== -1) chips[i].classList.add('mention');
+    else chips[i].classList.remove('mention');
+  }
+}
+$('#chips').addEventListener('click', function(e){
+  var el = e.target.closest ? e.target.closest('.chip') : null;
+  if(!el) return;
+  var p = providerById(el.getAttribute('data-id'));
+  if(!p) return;
+  if(!p.enabled || !p.key){
+    toast(p.enabled ? (p.name + ' 还没填 Key') : (p.name + ' 已在设置里关闭'));
+    return;
+  }
+  toggleSelection(p);
+  renderChips();
+});
+
+$('#input').addEventListener('input', function(){ autoGrow(); updateMentionHighlight(); });
+$('#input').addEventListener('focus', function(){
+  setTimeout(function(){ syncViewport(); if(pinned) scrollToBottom(true); }, 250);
+});
+$('#input').addEventListener('keydown', function(e){
+  // 桌面端回车发送；触屏端回车换行
+  var coarse = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
+  if(e.key === 'Enter' && !e.shiftKey && !coarse){
+    e.preventDefault();
+    send();
+  }
+});
+$('#send').addEventListener('click', send);
+$('#stop').addEventListener('click', stopStream);
+
+/* ---------- 闲聊（入口只有发送键旁边那颗绿色按钮） ---------- */
+$('#relayGo').addEventListener('click', runRelay);
+
+/* ---------- 显示思考过程（全局，默认关） ---------- */
+$('#showThink').addEventListener('change', function(){
+  var on = $('#showThink').checked;
+  lsSet(LS.showThink, on ? '1' : '0');
+  if(!on) hideAllThink();      // 关掉时立刻把屏幕上已有的灰块收走
+  dlog('showThink=' + on);
+});
+
+/* ==================== 流式请求 ==================== */
+function buildError(res, body){
+  var detail = '';
+  try{
+    var j = JSON.parse(body);
+    detail = (j && j.error && j.error.message) || (j && j.message) || '';
+  }catch(e){ detail = (body || '').slice(0, 300); }
+  var map = {
+    400:'请求格式有误', 401:'API Key 无效或已过期', 403:'无权限访问该模型',
+    404:'接口地址不存在', 429:'请求过于频繁或额度不足', 500:'服务端错误'
+  };
+  var msg = 'HTTP ' + res.status;
+  if(map[res.status]) msg += ' · ' + map[res.status];
+  if(detail) msg += ' · ' + detail;
+  return msg;
+}
+
+/* 把扁平的消息列表切成"轮次"：一条用户提问 + 紧随其后的若干条回答。
+   渲染、上下文拼接、总结三处共用这一套分组逻辑。 */
+function groupTurns(messages){
+  var turns = [], cur = null;
+  (messages || []).forEach(function(m){
+    if(m.role === 'user'){
+      cur = { user:m, replies:[] };
+      turns.push(cur);
+    }else{
+      if(!cur){ cur = { user:null, replies:[] }; turns.push(cur); }
+      cur.replies.push(m);
+    }
+  });
+  return turns;
+}
+
+/* 这一轮该不该显示「总结」入口：有人答成功、且还没总结过。
+   渲染时和整轮结束时都走这一个判断，避免两处条件跑偏。 */
+function turnNeedsSummaryButton(t){
+  if(!t || !t.user) return false;
+  var answered = 0, hasSummary = false;
+  (t.replies || []).forEach(function(m){
+    if(m.summary) hasSummary = true;
+    else if(m.content) answered++;
+  });
+  return !hasSummary && answered > 0;
+}
+
+/* 把这一轮各平台的回答拼成给"总结者"的上下文。
+   没答成功的（内容为空）和已有的总结气泡都跳过。 */
+function buildSummaryPrompt(turn){
+  var q = (turn && turn.user && turn.user.content) || '';
+  var lines = (turn ? turn.replies : [])
+    .filter(function(m){ return !m.summary && m.content; })
+    .map(function(m){ return '[' + providerName(m.provider) + ']: ' + m.content; });
+  return '以下是各 AI 对「' + q + '」的回答：\n' + lines.join('\n') +
+         '\n\n请综合以上所有回答，给出统一的结论、分歧点、可执行建议。';
+}
+
+/**
+ * 把会话历史整理成「某个模型视角」的 messages。
+ * 群聊里一轮提问会有多条 assistant 回答，直接发给 API 会出现连续同角色，
+ * 所以：优先用它自己上一轮的回答；它没答过（新启用 / 上轮失败）就带上别人的，标上名字；
+ * 最后合并连续同角色，保证 user/assistant 严格交替。
+ */
+function buildPayload(provider){
+  var flat = [];
+  groupTurns(getActive().messages).forEach(function(t){
+    if(t.user && t.user.content) flat.push({ role:'user', content:t.user.content });
+    var mine = null, others = [];
+    t.replies.forEach(function(r){
+      if(!r.content) return;
+      if(r.summary) return;              // 总结是元信息，不进任何平台的上下文
+      if(r.provider === provider.id) mine = r;
+      else others.push(r);
+    });
+    if(mine){
+      flat.push({ role:'assistant', content:mine.content });
+    }else if(others.length){
+      flat.push({ role:'assistant', content: others.map(function(r){
+        return '[' + providerName(r.provider) + '] ' + r.content;
+      }).join('\n\n') });
+    }
+  });
+
+  var merged = [];
+  flat.forEach(function(m){
+    var last = merged[merged.length - 1];
+    if(last && last.role === m.role) last.content += '\n\n' + m.content;
+    else merged.push({ role:m.role, content:m.content });
+  });
+
+  var out = merged.slice(-CONTEXT_MSGS);
+  while(out.length && out[0].role !== 'user') out.shift();   // 开头必须是 user
+  return out;
+}
+
+/**
+ * 流式对话。返回完整回答文本。
+ * @param {{id:string,name:string,endpoint:string,model:string,key:string}} provider
+ * @param {Array} messages
+ * @param {{onDelta?:Function, signal?:AbortSignal}} opts
+ */
+function streamChat(provider, messages, opts){
+  opts = opts || {};
+  var onDelta = opts.onDelta;
+
+  return fetch(provider.endpoint, {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'Authorization':'Bearer ' + provider.key
+    },
+    body: JSON.stringify({
+      model: provider.model,
+      messages: messages,
+      stream: true
+    }),
+    signal: opts.signal
+    // 注意：不要加 credentials:'include'，否则 ACAO 为 "*" 时会被浏览器直接拒绝
+  }).then(function(res){
+    if(!res.ok){
+      return res.text().then(function(body){ throw new Error(buildError(res, body)); },
+                             function(){ throw new Error(buildError(res, '')); });
+    }
+    if(!res.body) throw new Error('当前浏览器不支持流式响应');
+
+    var reader  = res.body.getReader();
+    var decoder = new TextDecoder('utf-8');
+    var buffer  = '';   // 跨 chunk 的半行
+    var full    = '';   // 累计正式回答（delta.content）
+    var reason  = '';   // 累计思考过程（delta.reasoning_content，只有思考模型才有）
+
+    function consumeLine(line){
+      line = line.replace(/\r$/, '');
+      if(!line || line.charAt(0) === ':') return false;           // 心跳/注释
+      if(line.indexOf('data:') !== 0) return false;               // event:/id: 一律忽略
+      var payload = line.slice(5).trim();
+      if(payload === '[DONE]') return true;                       // 结束哨兵
+      var json;
+      try{ json = JSON.parse(payload); }catch(e){ return false; } // 半行兜底：宁可丢，不要崩
+      var delta = json.choices && json.choices[0] && json.choices[0].delta;
+      var c = (delta && delta.content) || '';
+      var r = (delta && delta.reasoning_content) || '';
+      // 首包通常是 {delta:{role:'assistant',content:''}}；两样都空就跳过
+      if(!c && !r) return false;
+      // 思考过程单独累计，绝不混进正文 —— Kimi 这类思考模型会先刷一大段 reasoning
+      if(r) reason += r;
+      if(c) full += c;
+      if(onDelta) onDelta(c, full, reason);
+      return false;
+    }
+
+    function pump(){
+      return reader.read().then(function(r){
+        if(r.done){
+          // 把 decoder 尾字节吐出来
+          buffer += decoder.decode();
+          var nl = buffer.indexOf('\n');
+          while(nl !== -1){
+            consumeLine(buffer.slice(0, nl));
+            buffer = buffer.slice(nl + 1);
+            nl = buffer.indexOf('\n');
+          }
+          if(buffer) consumeLine(buffer);
+          dlog(provider.name, 'done', full.length, 'chars');
+          return full;
+        }
+        // stream:true —— 中文字符被切在两个 chunk 之间时不会乱码
+        buffer += decoder.decode(r.value, { stream:true });
+        var idx = buffer.indexOf('\n');
+        while(idx !== -1){
+          var done = consumeLine(buffer.slice(0, idx));
+          buffer = buffer.slice(idx + 1);
+          if(done){
+            reader.cancel().catch(function(){});
+            dlog(provider.name, '[DONE]', full.length, 'chars');
+            return full;
+          }
+          idx = buffer.indexOf('\n');
+        }
+        return pump();
+      });
+    }
+
+    return pump();
+  });
+}
+
+function stopStream(){
+  if(state.abort){
+    dlog('abort()');
+    state.abort.abort();
+  }
+}
+
+/* ==================== 发送 ==================== */
+function send(){
+  if(state.streaming) return;
+  var input = $('#input');
+  var text = input.value.trim();
+  if(!text) return;
+
+  var plan = resolveTargets(text);
+  var targets = plan.targets;
+  if(!targets.length){
+    if(plan.via === 'mention'){
+      toast('@ 提到的都不可用：' + plan.missing.map(providerName).join('、'));
+    }else if(!hasAnyKey()){
+      openSettings();
+      toast('先填 API Key');
+    }else if(!usableProviders().length){
+      openSettings();
+      toast('设置里至少要打开一个平台');
+    }else{
+      renderChips();
+      toast('至少点选一个 AI（点上方 chip）');
+    }
+    return;
+  }
+
+  var msgText = plan.text;
+  var s = getActive();
+  s.messages.push({ role:'user', content:msgText });
+  if(!s.title || s.title === '新对话') s.title = msgText.slice(0, 18);
+  s.updatedAt = Date.now();
+
+  input.value = '';
+  autoGrow();
+  updateMentionHighlight();
+  pinned = true;
+  $('#toBottom').hidden = true;
+
+  appendBubble('user', msgText);
+
+  // 每个模型一个独立气泡，各流各的
+  var jobs = targets.map(function(p){
+    var bubble = appendBubble('assistant', '', p.id);
+    bubble.classList.add('streaming');
+    return { p:p, bubble:bubble, body:bubbleBody(bubble), think:bubbleThink(bubble),
+             acc:'', reason:'', raf:0, err:null, answer:'' };
+  });
+  scrollToBottom(true);
+
+  var ctrl = new AbortController();   // 一个控制器管全部：停止 = 所有模型一起 abort
+  state.abort = ctrl;
+  setStreaming(true);
+  renderTopbar();
+  dlog('SEND via=' + plan.via, targets.map(function(p){ return p.name + '/' + p.model; }).join(' , '));
+  if(plan.missing.length){
+    toast(plan.missing.map(providerName).join('、') + ' 不可用，已跳过');
+  }
+
+  var tasks = jobs.map(function(j){
+    var payload = buildPayload(j.p);
+    return streamChat(j.p, payload, {
+      signal: ctrl.signal,
+      onDelta: function(piece, full, reasoning){
+        j.acc = full;
+        if(reasoning) j.reason = reasoning;
+        if(!j.raf){
+          j.raf = requestAnimationFrame(function(){
+            j.raf = 0;
+            // 思考过程先到：灰字显示在正文上方，免得气泡长时间空着看起来像卡死
+            // （开关关着时 paintThink 什么都不做）
+            paintThink(j.think, j.reason, !!j.acc);
+            if(j.acc) j.body.textContent = j.acc;
+            if(pinned) scrollToBottom();
+          });
+        }
+      }
+    }).then(function(answer){
+      j.answer = answer || '';
+    }, function(err){
+      j.err = err;
+      throw err;                      // 归类交给 allSettled
+    });
+  });
+
+  // 一个模型失败不影响其他：全部 settle 之后再各自收尾 UI 与历史
+  Promise.allSettled(tasks).then(function(){
+    jobs.forEach(function(j){
+      if(j.raf){ cancelAnimationFrame(j.raf); j.raf = 0; }
+      j.bubble.classList.remove('streaming');
+      // 收尾时把思考过程定格（失败/中断也要保留已经收到的部分）
+      paintThink(j.think, j.reason, true);
+
+      if(j.err){
+        if(j.err.name === 'AbortError'){
+          dlog(j.p.name, 'aborted at', j.acc.length, 'chars');
+          j.body.textContent = j.acc || '（已停止）';
+          if(j.acc) s.messages.push({ role:'assistant', content:j.acc, provider:j.p.id });
+        }else{
+          var msg = (j.err && j.err.message) || String(j.err);
+          dlog(j.p.name, 'ERR', msg);
+          j.bubble.classList.add('error');
+          j.body.textContent = '请求失败：' + msg;   // 错误只落在自己的气泡里
+        }
+      }else if(j.answer){
+        j.body.textContent = j.answer;
+        s.messages.push({ role:'assistant', content:j.answer, provider:j.p.id });
+      }else{
+        j.body.textContent = '（空回复）';
+      }
+    });
+
+    s.updatedAt = Date.now();
+    setStreaming(false);
+    state.abort = null;
+    renderTopbar();
+    save();
+
+    // 整轮结束了，补上「总结」入口 —— 之前漏了这一步，导致必须靠
+    // "切会话/开设置"这类副作用触发重建，按钮才出现。
+    // 这里刻意不调 renderMessages()：流式是"先建气泡再原地更新"，
+    // 重建列表会把失败平台的错误气泡一并抹掉（错误不入历史），
+    // 而用户正是靠它在看失败原因。所以只做一次定点插入。
+    //
+    // 顺序很重要：必须「先插按钮、再滚到底」。反过来的话，滚动时列表底部
+    // 正好停在折叠线上，随后插入的按钮就有一半留在可视区外（只露出上半截）。
+    if(state.activeId === s.id){
+      var turns = groupTurns(s.messages);
+      var finishedTurn = turns.length ? turns[turns.length - 1] : null;
+      if(turnNeedsSummaryButton(finishedTurn)) appendSummaryButton(finishedTurn);
+      updateSummaryButtons();
+    }
+    if(pinned) scrollToBottom();
+  });
+}
+
+/* ==================== 闲聊（内部函数名仍沿用 relay*） ==================== */
+/* 闲聊用的就是 chip 栏里勾选的平台（和普通群聊同一套勾选），按 chip 的先后顺序串行，
+   后面的能看到前面所有人的发言。不改动任何 chip 的选中状态，也不理开头的 @。
+   不自动总结（收尾只补一颗普通「总结」按钮）；自己拼 prompt（不走 buildPayload）、
+   走 streamChat、rAF 节流写 DOM、全程贴底。 */
+
+/* ---------- 随机风格池（只服务闲聊） ---------- */
+/* 每次闲聊开始时抽 N 个（N = 本次参与者数量）：N≤8 各不重复，N>8 抽完 8 个后再从池里随机补。
+   风格只活在这一次闲聊的 prompt 里 —— 不写历史、不碰普通群聊、也不碰总结。 */
+var RELAY_STYLES = [
+  { name:'知乎大佬',     desc:'理性、引用数据、结构清晰' },
+  { name:'贴吧老哥',     desc:'口语化、爱吐槽、有点皮' },
+  { name:'B站UP主',      desc:'有活力、爱举例、说"家人们"' },
+  { name:'小红书博主',   desc:'种草感、emoji 多、热情' },
+  { name:'微博网友',     desc:'短、情绪化、爱跟热点' },
+  { name:'豆瓣文艺青年', desc:'文艺、有哲思' },
+  { name:'程序员老哥',   desc:'技术宅、爱类比、偶尔自嘲' },
+  { name:'老大爷',       desc:'慢悠悠、讲道理、爱说"我跟你讲"' }
+];
+
+function pickRelayStyles(n){
+  var pool = RELAY_STYLES.slice(), i, j, t;
+  for(i = pool.length - 1; i > 0; i--){          // Fisher-Yates 洗牌
+    j = Math.floor(Math.random() * (i + 1));
+    t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+  }
+  var out = pool.slice(0, Math.min(n, pool.length));   // 前 N 个，天然不重复
+  while(out.length < n){                                // 超出 8 个：回池里再随机抽，允许重复
+    out.push(pool[Math.floor(Math.random() * pool.length)]);
+  }
+  return out;
+}
+
+/* 第 1 个只收原始问题；第 2 个起带上前面所有人的发言。
+   整个 prompt 按"微信群里随口接一句"来写（1-3 句话），别写论文、别分点。
+   style 是可选的，不传就完全不注入风格（普通群聊和「总结」都走这条路）。 */
+function buildRelayPrompt(question, prev, style){
+  var line = (style && style.name)
+    ? '请用【' + style.name + '】的语气说话（' + style.desc + '）。\n\n'
+    : '';
+  if(!prev.length){
+    return line +
+      '群里有人问：' + question + '\n' +
+      '你就像一个群友，随口说一句（1-3 句话）';
+  }
+  return line +
+    '你正在一个微信群里聊天。\n' +
+    '前面大家说了这些：\n' +
+    prev.map(function(a){ return '[' + a.label + ']：' + a.content; }).join('\n') +
+    '\n\n你就像一个群友，看到大家聊这个话题，随口接一句：\n' +
+    '- 1-3 句话，别长\n' +
+    '- 可以同意、反对、调侃、补充\n' +
+    '- 说人话，别写论文\n' +
+    '- 不用分点，不用总结';
+}
+
+/* 一次流式回答画进指定气泡。成功/失败/中断一律 resolve（不 reject）——
+   闲聊里"某个失败就跳过继续下一个"，用 reject 会把整条链掐断。 */
+function relayStep(provider, prompt, bubble, ctrl){
+  var body = bubbleBody(bubble), think = bubbleThink(bubble);
+  var j = { acc:'', reason:'', raf:0 };
+  bubble.classList.add('streaming');
+
+  function settle(){
+    if(j.raf){ cancelAnimationFrame(j.raf); j.raf = 0; }
+    bubble.classList.remove('streaming');
+    paintThink(think, j.reason, true);
+  }
+
+  return streamChat(provider, [{ role:'user', content:prompt }], {
+    signal: ctrl.signal,
+    onDelta: function(piece, full, reasoning){
+      j.acc = full;
+      if(reasoning) j.reason = reasoning;
+      if(j.raf) return;                 // 一个 rAF 周期内只写一次 DOM
+      j.raf = requestAnimationFrame(function(){
+        j.raf = 0;
+        paintThink(think, j.reason, !!j.acc);
+        if(j.acc) body.textContent = j.acc;
+        scrollToBottom(true);           // 闲聊全程贴底，不看 pinned
+      });
+    }
+  }).then(function(answer){
+    settle();
+    if(answer) body.textContent = answer;   // 只在最后一次性吐全文的模型也兜住
+    return { ok:!!answer, answer:answer || '', aborted:false };
+  }, function(err){
+    settle();
+    if(err && err.name === 'AbortError'){
+      body.textContent = j.acc || '（已停止）';
+      return { ok:!!j.acc, answer:j.acc, aborted:true };
+    }
+    bubble.classList.add('error');
+    body.textContent = '请求失败：' + ((err && err.message) || String(err));
+    return { ok:false, answer:'', aborted:false, err:err };
+  });
+}
+
+var relayTimer = 0;
+function setRelayStatus(text, cls, hideAfterMs){
+  var el = $('#relayStatus');
+  clearTimeout(relayTimer);
+  relayTimer = 0;
+  if(!text){
+    el.hidden = true;
+    el.textContent = '';
+    el.className = '';
+  }else{
+    el.hidden = false;
+    el.textContent = text;
+    el.className = cls || '';
+    if(hideAfterMs) relayTimer = setTimeout(function(){ setRelayStatus(''); }, hideAfterMs);
+  }
+  syncFab();   // 状态行出现/消失会改变底部高度
+}
+function runRelay(){
+  if(state.streaming){ toast('等当前回答结束再闲聊'); return; }
+  var input = $('#input');
+  var question = input.value.trim();
+  if(!question){ toast('先输入想聊的内容'); return; }
+
+  // 闲聊名单就是 chip 勾选的平台（usableProviders 保持 PROVIDERS 顺序 = chip 的先后顺序）
+  var targets = selectedProviders();
+  if(!targets.length){
+    if(!hasAnyKey()){
+      openSettings(); toast('先填 API Key');
+    }else if(!usableProviders().length){
+      openSettings(); toast('设置里至少要打开一个平台');
+    }else{
+      renderChips();
+      toast('至少勾选一个 AI');
+    }
+    return;
+  }
+
+  var s = getActive();
+  s.messages.push({ role:'user', content:question });
+  if(!s.title || s.title === '新对话') s.title = question.slice(0, 18);
+  s.updatedAt = Date.now();
+
+  input.value = '';
+  autoGrow();
+  updateMentionHighlight();
+  $('#toBottom').hidden = true;
+  pinned = true;
+  appendBubble('user', question);
+  renderTopbar();
+
+  var ctrl = new AbortController();
+  state.abort = ctrl;
+  setStreaming(true);
+
+  // 本次闲聊的风格分配：抽 targets.length 个，按顺序一人一个（只在这一次有效）
+  var styles = pickRelayStyles(targets.length);
+  dlog('CHAT start · ' + targets.map(function(p){ return p.name + '/' + p.model; }).join(' , ') +
+       ' · 风格: ' + styles.map(function(s){ return s.name; }).join(' / '));
+
+  var answers = [], aborted = false, total = targets.length;
+
+  // 串行：每一步都等上一步结束 —— 后面的必须看到前面所有发言
+  var chain = Promise.resolve();
+  targets.forEach(function(p, i){
+    chain = chain.then(function(){
+      if(aborted || ctrl.signal.aborted){ aborted = true; return; }
+      setRelayStatus(p.name + ' 正在回答（' + (i + 1) + '/' + total + '）', 'busy');
+      var bubble = appendBubble('assistant', '', p.id);
+      scrollToBottom(true);
+      return relayStep(p, buildRelayPrompt(question, answers, styles[i]), bubble, ctrl)
+        .then(function(r){
+          if(r.ok){
+            // 被"停止"时若已经收到半截，也算这一位的回答（和总结那条路径一致）
+            answers.push({ label:p.name, content:r.answer });
+            s.messages.push({ role:'assistant', content:r.answer, provider:p.id });
+            save();                     // 逐步落盘：中途出意外也留得住前面的回答
+          }else if(r.aborted){
+            /* 点了停止且一个字都没收到：不记历史，也不算失败 */
+          }else if(r.err){
+            dlog(p.name, 'RELAY ERR', (r.err && r.err.message) || '');
+            toast(p.name + ' 失败，已跳过');     // 失败不中断，继续下一个
+          }else{
+            toast(p.name + ' 空回复，已跳过');
+          }
+          if(r.aborted) aborted = true;
+        });
+    });
+  });
+
+  return chain.then(function(){
+    var done = '闲聊完成（' + answers.length + '/' + total + ' 成功）';
+    if(aborted) done = '闲聊已停止（' + answers.length + '/' + total + ' 已保留）';
+    // 不再自动总结：跑完就把状态行留着，6 秒后自己消失
+    setRelayStatus(done, '', 6000);
+  }).then(function(){
+    s.updatedAt = Date.now();
+    setStreaming(false);
+    state.abort = null;
+    save();
+    // 补上普通的那颗「总结」按钮，想总结时自己点 —— 和 send() 同一套定点插入，
+    // 刻意不 renderMessages()：重建列表会把失败平台的错误气泡抹掉。
+    if(state.activeId === s.id){
+      var turns = groupTurns(s.messages);
+      var last = turns.length ? turns[turns.length - 1] : null;
+      if(turnNeedsSummaryButton(last)) appendSummaryButton(last);
+      updateSummaryButtons();
+    }
+    scrollToBottom(true);
+  });
+}
+
+/* ==================== 启动 ==================== */
+function init(){
+  // 每个模型读自己的配置；enabled 默认开
+  PROVIDERS.forEach(function(p){
+    if(p.family){
+      // 智谱成员：Key 6 个共用一份，endpoint / 模型名写死，enabled 缺省全开
+      p.key      = lsGet(p.family + '.key', '');
+      p.endpoint = p.defEndpoint;
+      p.model    = p.defModel;
+      p.enabled  = lsGet(p.id + '.enabled', '1') !== '0';
+      p.selected = lsGet(p.id + '.selected', '1') !== '0';
+      return;
+    }
+    p.key      = lsGet(p.id + '.key', '');
+    p.model    = lsGet(p.id + '.model', p.defModel) || p.defModel;
+    p.endpoint = lsGet(p.id + '.endpoint', p.defEndpoint) || p.defEndpoint;
+    // 换过接口地址的平台做一次迁移：手机上早就把旧默认值存进了 localStorage，
+    // 只改 defEndpoint 是不生效的（init 读的是存档）。存的正好是旧默认值就换成新的。
+    if((LEGACY_ENDPOINTS[p.id] || []).indexOf(p.endpoint) !== -1) p.endpoint = p.defEndpoint;
+    p.enabled  = lsGet(p.id + '.enabled', '1') !== '0';
+    p.selected = lsGet(p.id + '.selected', '1') !== '0';   // chip 默认全选
+  });
+
+  try{
+    var arr = JSON.parse(lsGet(LS.sessions, '[]'));
+    state.sessions = Array.isArray(arr) ? arr.filter(function(s){
+      return s && typeof s === 'object' && Array.isArray(s.messages);
+    }) : [];
+  }catch(e){ state.sessions = []; }
+
+  state.activeId = lsGet(LS.activeId, '');
+  if(!state.sessions.length) state.sessions.push(makeSession());
+  var found = false;
+  for(var i = 0; i < state.sessions.length; i++) if(state.sessions[i].id === state.activeId) found = true;
+  if(!found) state.activeId = state.sessions[0].id;
+
+  renderMessages();
+  renderTopbar();
+  renderHistory();
+  renderChips();
+  // 「显示思考过程」缺省关
+  $('#showThink').checked    = lsGet(LS.showThink, '0') === '1';
+  setStreaming(false);
+  autoGrow();
+  syncViewport();
+  syncFab();
+  dlog('init ok · sessions=' + state.sessions.length + ' · ' +
+       PROVIDERS.map(function(p){ return p.id + ':' + (p.key ? 'key' : 'nokey') + (p.enabled ? '/on' : '/off'); }).join(' '));
+
+  if(!hasAnyKey()){
+    setTimeout(function(){ openSettings(); toast('至少填一个 API Key'); }, 150);
+  }
+}
+init();
+
+})();
+</script>
+</body>
+</html>
