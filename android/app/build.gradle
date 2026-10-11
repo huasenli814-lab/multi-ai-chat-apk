@@ -1,0 +1,33 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.likeda.multiaichat'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.likeda.multiaichat"
+        minSdk 26                 // Android 8.0+；用矢量图标做启动图标要求 26+
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            // 先用 debug 签名，装上就能用；要做"能原地升级"的正式签名见 README
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    // WebViewAssetLoader：让页面跑在 https://appassets.androidplatform.net/ 这个正规来源下，
+    // 而不是 file://（file:// 的 Origin 是 null，很多 API 的跨域会直接拒绝）
+    implementation 'androidx.webkit:webkit:1.11.0'
+}
