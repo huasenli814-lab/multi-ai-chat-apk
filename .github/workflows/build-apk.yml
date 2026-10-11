@@ -1,0 +1,76 @@
+name: 构建 APK
+
+# 什么时候构建：手动点一下，或者改了应用本体/壳工程/这个脚本时自动构建
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'index.html'
+      - 'android/**'
+      - '.github/workflows/build-apk.yml'
+
+permissions:
+  contents: write          # 往 Releases 里挂 APK 需要这个权限（用的是内置 GITHUB_TOKEN，不用配密钥）
+
+# 同一时间只跑一个构建：连着推几个文件时，旧的那次自动取消，不会排一长队白烧额度
+concurrency:
+  group: apk-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest          # 构建机自带 JDK / Android SDK / Gradle，本地什么都不用装
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 装 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 准备 Android SDK（自动接受许可协议）
+        uses: android-actions/setup-android@v3
+
+      - name: 准备 Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: 补齐 SDK 组件
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
+      - name: 把网页放进 APK 的 assets
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp index.html android/app/src/main/assets/index.html
+          ls -l android/app/src/main/assets/ | head
+
+      - name: 构建 debug APK
+        working-directory: android
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: 整理文件名
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/debug/app-debug.apk out/multi-ai-chat.apk
+
+      - name: 上传构建产物（保留 90 天，下载得到 zip）
+        uses: actions/upload-artifact@v4
+        with:
+          name: multi-ai-chat-apk
+          path: out/multi-ai-chat.apk
+          if-no-files-found: error
+
+      # 把 APK 挂到 Releases 上：手机上点开就能直接下 .apk（不用解压 zip）
+      - name: 发布到 Releases（手机直下 APK）
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-latest
+          name: 最新 APK
+          body: |
+            由 GitHub Actions 自动构建，点下面的 **multi-ai-chat.apk** 下载安装即可。
+            每次重新构建都会覆盖这个版本。
+          files: out/multi-ai-chat.apk
+          make_latest: true
